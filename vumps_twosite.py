@@ -226,8 +226,6 @@ def Apply_HAC(hL_mid,hR_mid,Hl,Hr,X):
 
 def calc_new_A(AL,AR,AC,C):
 
-    # New Error Method
-
     Al = AL.reshape(d*D,D)
     Ar = AR.transpose(1,0,2).reshape(D,d*D)
 
@@ -259,11 +257,6 @@ def calc_new_A(AL,AR,AC,C):
 
     AL = (ulAC @ ulC.T.conj()).reshape(D, d, D).transpose(1, 0, 2)
     AR = (urC.T.conj() @ urAC).reshape(D, d, D).transpose(1, 0, 2)
-
-    # Old Error Method
-
-    # print('old error left',np.linalg.norm(plAC - plC))
-    # print('old error right',np.linalg.norm(prAC - prC))
 
     return epl, epr, AL, AR
 
@@ -567,7 +560,7 @@ XYZ = -(x*np.kron(sx, sx) + y*np.kron(sy, sy) - z*np.kron(sz, sz)) #+ 0.5*(np.kr
 
 XY  = -x*np.kron(sx, sx) - y*np.kron(sy, sy)
 
-TFI = -np.kron(sx, sx) - np.kron(sz, si)
+TFI = -np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
 
 tVV2 = -2 * t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
 
@@ -593,21 +586,19 @@ AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
 AL, C = left_ortho(AR, C, tol/100)
 AR, C = right_ortho(AL, C, tol/100)
 
-while ep > tol and count < 400:
-    print(count)
+while ep > tol and count < 1000:
+    print(count, end='\t')
 
     AL, AR, C, Hl, Hr, e, epl, epr, x = vumps(AL,AR,C,h,Hl,Hr,ep)
 
-    print('ep ', ep)
+    ep = np.maximum(epl,epr)
 
-    if np.maximum(epl,epr) < ep:
-        ep = np.maximum(epl,epr)
+    print('ep ', ep, end='\t')
+    print('energy', e)
 
     energy.append(e)
     error.append(ep)
     discard_weight.append(x)
-
-    AL, C = left_ortho(AR, C, tol/100)
     
     count += 1
 
