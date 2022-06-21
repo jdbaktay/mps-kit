@@ -48,7 +48,7 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
 
     H = spspla.LinearOperator((d*D*d*D,d*D*d*D), matvec=eff_ham)
 
-    w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
+    w, v = spspla.eigsh(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
 
     s = spla.svdvals(v[:,0].reshape(d*D,d*D))
 
@@ -252,11 +252,11 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     g = functools.partial(Apply_HAC, hL_mid, hR_mid, Hl, Hr)
 
     H = spspla.LinearOperator((D*D,D*D), matvec=f)
-    w, v = spspla.eigs(H, k=1, which='SR', v0=C.ravel(), tol=ep/100, return_eigenvectors=True)
+    w, v = spspla.eigsh(H, k=1, which='SR', v0=C.ravel(), tol=ep/100, return_eigenvectors=True)
     C = v[:,0].reshape(D,D)
 
     H = spspla.LinearOperator((D*d*D,D*d*D), matvec=g)
-    w, v = spspla.eigs(H, k=1, which='SR', v0=AC.ravel(), tol=ep/100, return_eigenvectors=True)
+    w, v = spspla.eigsh(H, k=1, which='SR', v0=AC.ravel(), tol=ep/100, return_eigenvectors=True)
     AC = v[:,0].reshape(D,d,D)
 
     epl, epr, AL, AR = calc_new_A(AL,AR,AC,C)
@@ -430,7 +430,7 @@ count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 15
+D = 48
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
@@ -452,7 +452,7 @@ XY  = -x*np.kron(sx, sx) - y*np.kron(sy, sy)
 
 TFI = -np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
 
-tVV2 = -2 * t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
+tVV2 = -t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
 
 ####################################################
 
