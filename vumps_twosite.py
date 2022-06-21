@@ -145,25 +145,25 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     Ol = spspla.LinearOperator((D**2,D**2), matvec=left_env)
     Or = spspla.LinearOperator((D**2,D**2), matvec=right_env)
 
-    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100) 
-    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100)
+    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100, atol=ep/100) 
+    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100, atol=ep/100)
 
     Hl, Hr = Hl.reshape(D,D), Hr.reshape(D,D)
 
     Hl = 0.5 * (Hl + Hl.T.conj())
     Hr = 0.5 * (Hr + Hr.T.conj())
 
-    # print('hl == hl+', spla.norm(hl - hl.T.conj()))
-    # print('hr == hr+', spla.norm(hr - hr.T.conj()))
+    print('hl == hl+', spla.norm(hl - hl.T.conj()))
+    print('hr == hr+', spla.norm(hr - hr.T.conj()))
 
-    # print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
-    # print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
+    print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
+    print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
 
-    # print('(L|hr)', np.trace(C.T.conj()@C@hr))
-    # print('(hl|R)', np.trace(hl@C@C.T.conj()))
+    print('(L|hr)', np.trace(C.T.conj()@C@hr))
+    print('(hl|R)', np.trace(hl@C@C.T.conj()))
 
-    # print('(L|Hr)', np.trace(C.T.conj()@C@Hr))
-    # print('(Hl|R)', np.trace(Hl@C@C.T.conj()))
+    print('(L|Hr)', np.trace(C.T.conj()@C@Hr))
+    print('(Hl|R)', np.trace(Hl@C@C.T.conj()))
 
     return Hl, Hr, e
 
@@ -219,8 +219,8 @@ def calc_new_A(AL,AR,AC,C):
     epl = spla.norm(Bl)
     epr = spla.norm(Br)
 
-    # print('new error left', epl)
-    # print('new error right',epr)
+    print('epl', epl)
+    print('epr', epr)
 
     ulAC, plAC = spla.polar(AC.reshape(D * d, D), side='right')
     urAC, prAC = spla.polar(AC.reshape(D, d * D), side='left')
@@ -342,8 +342,8 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
         left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
@@ -408,8 +408,8 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
         left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
@@ -430,7 +430,7 @@ count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 64
+D = 15
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
@@ -477,7 +477,7 @@ AL, C = left_ortho(AR, C, tol/100)
 AR, C = right_ortho(AL, C, tol/100)
 
 while ep > tol and count < 1000:
-    print(count, end='\t')
+    print(count)
 
     AL, AR, C, Hl, Hr, e, epl, epr, x = vumps(AL,AR,C,h,Hl,Hr,ep)
 
@@ -485,22 +485,20 @@ while ep > tol and count < 1000:
     print('right iso', spla.norm(nc([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
     print('norm', nc([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
     print('ALC - CAR', spla.norm(nc([AL,C],[[-1,-2,1],[1,-3]]) - nc([C,AR],[[-2,1], [-1,1,-3]])))
-    print()
 
     ep = np.maximum(epl,epr)
 
-    print('ep ', ep, end='\t')
+    print('ep ', ep)
     print('energy', e)
 
     energy.append(e)
     error.append(ep)
     discard_weight.append(x)
+
+    print()
     
     count += 1
 
-q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
-
-q, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None,N)
 
 plt.plot(np.array(energy).real)
 plt.show()
@@ -511,12 +509,17 @@ plt.show()
 plt.plot(np.array(discard_weight))
 plt.show()
 
-plt.plot(q, momentum)
-plt.show()
-
+q, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None,N)
+# np.savetxt('s_D' + str(D) + '.dat', np.column_stack(stat_struc_fact), fmt=' %s')
 plt.plot(q, stat_struc_fact)
-plt.show()
+plt.xticks(np.linspace(0, 1, 5)*np.pi)
+plt.grid(); plt.show()
 
+q, momentum = calc_momentum(AL,AR,C,sp, sm, -sz,N)
+# np.savetxt('n_D' + str(D) + '.dat', np.column_stack(momentum), fmt=' %s')
+plt.plot(q, momentum)
+plt.xticks(np.linspace(0, 1, 5)*np.pi)
+plt.grid(); plt.show()
 
 # model = 'tVV2'
 
