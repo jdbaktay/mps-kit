@@ -314,9 +314,8 @@ def calc_fidelity(X,Y):
     
     return np.max(np.abs(evals))
 
-def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
+def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
   
-    N = 500
     q = np.linspace(0,np.pi,N)
 
     stat_struc_fact = []
@@ -329,6 +328,7 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
     indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
     s1 = nc(tensors, indices, contord)
+    print('s --> s1', s1)
 
     def left(X,o,Y):
         indices =[(2,1,-2), (3,2), (3,1,-1)]
@@ -341,36 +341,36 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
     s2l, s2r = left(AC,o1,AL), right(AR,o2,AC)
     s3l, s3r = left(AL,o2,AC), right(AC,o1,AR)
 
-    def left_fixed_point(A,B):
-        def left_transfer_op(X):
+    # def left_fixed_point(A,B):
+    #     def left_transfer_op(X):
 
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
+    #         tensors = [A, X.reshape(D, D), B.conj()]
+    #         indices = [(1,2,-2), (3, 2), (1, 3, -1)]
+    #         contord = [2, 3, 1]
+    #         return nc(tensors,indices,contord).ravel()
 
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
+    #     E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
+    #     evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
+    #     return evecs[:,0].reshape(D,D)
 
-    def right_fixed_point(A,B):
-        def right_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
+    # def right_fixed_point(A,B):
+    #     def right_transfer_op(X):
+    #         tensors = [A, X.reshape(D, D), B.conj()]
+    #         indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
+    #         contord = [2, 3, 1]
+    #         return nc(tensors,indices,contord).ravel()
 
-        E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
+    #     E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
+    #     evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
+    #     return evecs[:,0].reshape(D,D)
 
-    l_Erl, r_Erl = left_fixed_point(AR,AL), right_fixed_point(AR,AL)
+    # l_Erl, r_Erl = left_fixed_point(AR,AL), right_fixed_point(AR,AL)
 
-    l_Erl, r_Erl = l_Erl/np.sqrt(np.trace(l_Erl@r_Erl)), r_Erl/np.sqrt(np.trace(l_Erl@r_Erl))
+    # l_Erl, r_Erl = l_Erl/np.sqrt(np.trace(l_Erl@r_Erl)), r_Erl/np.sqrt(np.trace(l_Erl@r_Erl))
 
-    l_Elr, r_Elr = left_fixed_point(AL,AR), right_fixed_point(AL,AR)
+    # l_Elr, r_Elr = left_fixed_point(AL,AR), right_fixed_point(AL,AR)
 
-    l_Elr, r_Elr = l_Elr/np.sqrt(np.trace(l_Elr@r_Elr)), r_Elr/np.sqrt(np.trace(l_Elr@r_Elr))
+    # l_Elr, r_Elr = l_Elr/np.sqrt(np.trace(l_Elr@r_Elr)), r_Elr/np.sqrt(np.trace(l_Elr@r_Elr))
 
     def left_env(X):
         X = X.reshape(D,D)
@@ -380,8 +380,8 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
         contord = [2, 3, 1]
 
         XT = nc(tensors, indices, contord)
-        XR = np.trace(X @ r_Erl)*l_Erl
-        return (X - np.exp(-1.0j*p)*(XT-XR)).ravel()
+        # XR = np.trace(X @ r_Erl)*l_Erl
+        return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
         X = X.reshape(D, D)
@@ -391,8 +391,10 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
         contord = [2, 3, 1]
 
         XT = nc(tensors, indices, contord)
-        XL = np.trace(l_Elr @ X) * r_Elr
-        return (X - np.exp(+1.0j*p)*(XT-XL)).ravel()
+        # XL = np.trace(l_Elr @ X) * r_Elr
+        return (X - np.exp(+1.0j * p) * XT).ravel()
+
+    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
     for i in range(N):
         p = q[i]
@@ -400,8 +402,8 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
         left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), tol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), tol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12)
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
@@ -414,17 +416,16 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
 
     return q, np.array(stat_struc_fact)
 
-def calc_momentum(AL,AR,C,o1,o2,o3):
-  
-    N = 500
+def calc_momentum(AL,AR,C,o1,o2,o3,N):
+
     q = np.linspace(0,np.pi,N)
 
     momentum = []
     AC = td(AL, C, axes=(2,0))
 
-    o1 = o1 - nc([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o2 = o2 - nc([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o3 = o3 - nc([AC, o3, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    # o1 = o1 - nc([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    # o2 = o2 - nc([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    # o3 = o3 - nc([AC, o3, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
 
     # print(nc([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]]))
     # print(nc([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]]))
@@ -438,8 +439,7 @@ def calc_momentum(AL,AR,C,o1,o2,o3):
     indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
     s1 = nc(tensors, indices, contord)
-
-    # check to see if s1 makes sense. should be 1/2? n^2 = n?
+    print('n --> s1', s1)
 
     def left(X,o,Y):
         indices =[(2,1,-2), (3,2), (3,1,-1)]
@@ -452,36 +452,36 @@ def calc_momentum(AL,AR,C,o1,o2,o3):
     s2l, s2r = left(AC,o1,AL), right(AR,o2,AC)
     s3l, s3r = left(AL,o2,AC), right(AC,o1,AR)
 
-    def left_fixed_point(A,B):
-        def left_transfer_op(X):
+    # def left_fixed_point(A,B):
+    #     def left_transfer_op(X):
 
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
+    #         tensors = [A, X.reshape(D, D), B.conj()]
+    #         indices = [(1,2,-2), (3, 2), (1, 3, -1)]
+    #         contord = [2, 3, 1]
+    #         return nc(tensors,indices,contord).ravel()
 
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
+    #     E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
+    #     evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
+    #     return evecs[:,0].reshape(D,D)
 
-    def right_fixed_point(A,B):
-        def right_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
+    # def right_fixed_point(A,B):
+    #     def right_transfer_op(X):
+    #         tensors = [A, X.reshape(D, D), B.conj()]
+    #         indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
+    #         contord = [2, 3, 1]
+    #         return nc(tensors,indices,contord).ravel()
 
-        E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
+    #     E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
+    #     evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
+    #     return evecs[:,0].reshape(D,D)
 
-    l_Erl, r_Erl = left_fixed_point(AR,AL), right_fixed_point(AR,AL)
+    # l_Erl, r_Erl = left_fixed_point(AR,AL), right_fixed_point(AR,AL)
 
-    l_Erl, r_Erl = l_Erl/np.sqrt(np.trace(l_Erl@r_Erl)), r_Erl/np.sqrt(np.trace(l_Erl@r_Erl))
+    # l_Erl, r_Erl = l_Erl/np.sqrt(np.trace(l_Erl@r_Erl)), r_Erl/np.sqrt(np.trace(l_Erl@r_Erl))
 
-    l_Elr, r_Elr = left_fixed_point(AL,AR), right_fixed_point(AL,AR)
+    # l_Elr, r_Elr = left_fixed_point(AL,AR), right_fixed_point(AL,AR)
 
-    l_Elr, r_Elr = l_Elr/np.sqrt(np.trace(l_Elr@r_Elr)), r_Elr/np.sqrt(np.trace(l_Elr@r_Elr))
+    # l_Elr, r_Elr = l_Elr/np.sqrt(np.trace(l_Elr@r_Elr)), r_Elr/np.sqrt(np.trace(l_Elr@r_Elr))
 
     # print(np.trace(l_Erl@r_Erl))
     # print(spla.norm(np.subtract(l_Erl, nc([l_Erl, AR, AL.conj()], [[2,1], [3,1,-2], [3,2,-1]]))))
@@ -499,8 +499,8 @@ def calc_momentum(AL,AR,C,o1,o2,o3):
         contord = [2, 3, 4, 1]
 
         XT = nc(tensors, indices, contord)
-        XR = np.trace(X @ r_Erl)*l_Erl
-        return (X - np.exp(-1.0j*p)*(XT-XR)).ravel()
+        # XR = np.trace(X @ r_Erl)*l_Erl
+        return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
         X = X.reshape(D, D)
@@ -510,17 +510,19 @@ def calc_momentum(AL,AR,C,o1,o2,o3):
         contord = [2, 3, 4, 1]
 
         XT = nc(tensors, indices, contord)
-        XL = np.trace(l_Elr @ X) * r_Elr
-        return (X - np.exp(+1.0j*p)*(XT-XL)).ravel()
+        # XL = np.trace(l_Elr @ X) * r_Elr
+        return (X - np.exp(+1.0j * p) * XT).ravel()
+
+    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
     for i in range(N):
-        p = q[i]; print(i)
+        p = q[i]#; print(i)
 
         left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), tol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), tol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12)
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
@@ -541,14 +543,15 @@ count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 15
+D = 25
+N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
 sy, sz = np.array([[0, -1j],[1j, 0]]), np.array([[1, 0],[0, -1]])
 sp, sm, n = 0.5*(sx + 1.0j*sy), 0.5*(sx - 1.0j*sy), 0.5*(sz + np.eye(d))
 
-x = 0
-y = 0
+x = 1
+y = 1
 z = 0
 
 t  = 1
@@ -566,7 +569,7 @@ tVV2 = -2 * t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
 
 ####################################################
 
-h = tVV2
+h = XYZ
 h = h.reshape(d,d,d,d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -602,6 +605,10 @@ while ep > tol and count < 1000:
     
     count += 1
 
+q, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None,N)
+
+# q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
+
 plt.plot(np.array(energy).real)
 plt.show()
 
@@ -611,9 +618,9 @@ plt.show()
 plt.plot(np.array(discard_weight))
 plt.show()
 
-# _, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None)
+plt.plot(q, stat_struc_fact)
+plt.show()
 
-# _, momentum = calc_momentum(AL,AR,C,sp, sm, -sz)
 
 # model = 'tVV2'
 
