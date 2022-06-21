@@ -300,9 +300,9 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     return AL, AR, C, Hl, Hr, e, epl, epr, x
 
 def calc_entent(C):
-    u, s, vh = spla.svd(C)
+    s = spla.svdvals(C)
 
-    b = -np.log(np.max(s))
+    b = -np.log(s[0])
 
     entent = 0
     for i in range(np.size(s)):
