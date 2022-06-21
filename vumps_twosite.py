@@ -124,14 +124,8 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     def left_env(X):
         X = X.reshape(D, D)
 
-        # tensors = [X, AL, AL.conj()]
-        # indices = [(1, 2), (3, 2, -2), (3, 1, -1)]
-        # contord = [2, 3, 1]
-        # XT = nc(tensors, indices, contord)
-
-        t = td(X, AL, axes=(1,1))
-        t = td(t, AL.conj(), axes=([0,1], [1,0])).transpose(1,0)
-        XT = t
+        t = X@AL.transpose(1,0,2).reshape(D,d*D)
+        XT = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,D)
 
         XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
 
@@ -441,7 +435,7 @@ count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 64
+D = 15
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
