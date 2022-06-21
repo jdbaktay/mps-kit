@@ -181,18 +181,10 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
 def Apply_HC(AL,AR,h,Hl,Hr,X):
     X = X.reshape(D, D)
 
-    # tensors = [AL, X, AR, h, AL.conj(), AR.conj()]
-    # indices = [(3, 7, 1), (1, 2), (4, 2, 8), (5, 6, 3, 4), (5, 7, -1), (6, -2, 8)]
-    # contord = [7, 3, 5, 1, 2, 8, 4, 6]
-    # H1 = nc(tensors, indices, contord)
-
     t = AL.reshape(d*D,D)@X@AR.transpose(1,0,2).reshape(D,d*D)
     t = h.reshape(d**2,d**2)@t.reshape(d,D,d,D).transpose(0,2,1,3).reshape(d**2,D*D)
     t = t.reshape(d,d,D,D).transpose(0,2,1,3).reshape(d*D,d*D)
-    t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t@AR.conj().transpose(0,2,1).reshape(d*D,D)
-    H1 = t
-
-    # print('check ',spla.norm(H1 - t))
+    H1 = AL.conj().transpose(2,0,1).reshape(D,d*D)@t@AR.conj().transpose(0,2,1).reshape(d*D,D)
 
     H2 = Hl @ X
     H3 = X @ Hr
