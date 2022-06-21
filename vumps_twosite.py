@@ -47,9 +47,10 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
     two_site = nc([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
 
     H = spspla.LinearOperator((d*D*d*D,d*D*d*D), matvec=eff_ham)
+
     w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
 
-    u, s, vh = spla.svd(v[:,0].reshape(d*D,d*D))
+    s = spla.svdvals(v[:,0].reshape(d*D,d*D))
 
     t = 0
     for i in range(D,d*D):
@@ -575,7 +576,7 @@ count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 30
+D = 15
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
 sy, sz = np.array([[0, -1j],[1j, 0]]), np.array([[1, 0],[0, -1]])
@@ -633,42 +634,52 @@ while ep > tol and count < 400:
     
     count += 1
 
+
+plt.plot(np.array(energy).real)
+plt.show()
+
+plt.plot(np.array(error))
+plt.show()
+
+plt.plot(np.array(discard_weight))
+plt.show()
+
 # _, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None)
 
-_, momentum = calc_momentum(AL,AR,C,sp, sm, -sz)
+# _, momentum = calc_momentum(AL,AR,C,sp, sm, -sz)
 
-model = 'tVV2'
+# model = 'tVV2'
 
-path = '/home/baktay.j/vumps/data'
+# path = '/home/baktay.j/vumps/data'
 
-filename = "energy_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-np.savetxt(os.path.join(path, filename), energy)
+# filename = "energy_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), energy)
 
-filename = "error_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-np.savetxt(os.path.join(path, filename), error)
+# filename = "error_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), error)
 
-filename = "discweight_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-np.savetxt(os.path.join(path, filename), discard_weight)
+# filename = "discweight_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), discard_weight)
 
-filename = "statstrucfact_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
-np.savetxt(os.path.join(path, filename), stat_struc_fact)
+# filename = "statstrucfact_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
+# np.savetxt(os.path.join(path, filename), stat_struc_fact)
 
-filename = "momentum_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
-np.savetxt(os.path.join(path, filename), momentum)
+# filename = "momentum_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
+# np.savetxt(os.path.join(path, filename), momentum)
 
-filename1 = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-filename2 = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-filename3 = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename1 = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename2 = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename3 = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 
-open(os.path.join(path, filename1), 'a')
-for data_slice in AL:
-    np.savetxt(os.path.join(path, filename1), data_slice)
+# open(os.path.join(path, filename1), 'a')
+# for data_slice in AL:
+#     np.savetxt(os.path.join(path, filename1), data_slice)
 
-open(os.path.join(path, filename2), 'a')
-for data_slice in AR:
-    np.savetxt(os.path.join(path, filename2), data_slice)
+# open(os.path.join(path, filename2), 'a')
+# for data_slice in AR:
+#     np.savetxt(os.path.join(path, filename2), data_slice)
 
-np.savetxt(os.path.join(path, filename3), C)
+# np.savetxt(os.path.join(path, filename3), C)
 
 
 
