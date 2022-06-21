@@ -58,7 +58,7 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
         
     return t
 
-def left_ortho(A,X0,D,tol):
+def left_ortho(A,X0,tol):
 
     def left_fixed_point(A,B):
         def left_transfer_op(X):
@@ -91,38 +91,10 @@ def left_ortho(A,X0,D,tol):
 
     return AL, L
 
-def right_ortho(A,X0,D,tol):
-
-    def right_fixed_point(A,B):
-        def right_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
-
-        evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
-
-        return evals[0], evecs[:,0].reshape(D,D)
-
-    norm, r = right_fixed_point(A,A)
-
-    A = A/np.sqrt(norm)
-
-    r = 0.5*(r + r.T.conj())
-
-    r = r/np.trace(r)
-
-    w, v = spla.eigh(r)
-    r = v@np.diag(np.abs(w))@v.T.conj()
-
-    R = spla.cholesky(r, lower=True)
-    Ri = spla.inv(R)
-
-    AR = nc([Ri, A, R], [(-2,1), (-1,1,2), (2,-3)])
-
-    return AR, R
+def right_ortho(A, X0, tol):
+    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol)
+    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))
+    return A, L
 
 def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
 
@@ -608,8 +580,8 @@ A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5
 Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 
-AL, C = left_ortho(A,C,D, tol/100)
-AR, C = right_ortho(AL,C,D, tol/100)
+AL, C = left_ortho(A, C, tol/100)
+AR, C = right_ortho(AL, C, tol/100)
 
 print('left iso', spla.norm(nc([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
 print('right iso', spla.norm(nc([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
@@ -618,15 +590,15 @@ print('ALC - CAR', spla.norm(nc([AL,C],[[-1,-2,1],[1,-3]]) - nc([C,AR],[[-2,1], 
 
 AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
 
-AL, C = left_ortho(AR, C, D, tol/100)
-AR, C = right_ortho(AL, C, D, tol/100)
+AL, C = left_ortho(AR, C, tol/100)
+AR, C = right_ortho(AL, C, tol/100)
 
 while ep > tol and count < 400:
     print(count)
 
     AL, AR, C, Hl, Hr, e, epl, epr, x = vumps(AL,AR,C,h,Hl,Hr,ep)
 
-    print(ep)
+    print('ep ', ep)
 
     if np.maximum(epl,epr) < ep:
         ep = np.maximum(epl,epr)
@@ -635,10 +607,9 @@ while ep > tol and count < 400:
     error.append(ep)
     discard_weight.append(x)
 
-    AL, C = left_ortho(AR, C, D, tol/100)
+    AL, C = left_ortho(AR, C, tol/100)
     
     count += 1
-
 
 plt.plot(np.array(energy).real)
 plt.show()
