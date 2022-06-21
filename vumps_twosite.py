@@ -134,14 +134,9 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     def right_env(X):
         X = X.reshape(D, D)
 
-        # tensors = [AR, AR.conj(), X]
-        # indices = [(3, -1, 2), (3, -2, 1), (2, 1)]
-        # contord = [2, 3, 1]
-        # XT = nc(tensors, indices, contord)
-
-        t = td(AR, X, axes=(2,0))
-        t = td(t, AR.conj(), axes=([2,0], [2,0]))
-        XT = t
+        t = AR.reshape(d*D,D)@X
+        t = t.reshape(d,D,D).transpose(1,2,0).reshape(D,D*d)
+        XT = t@AR.conj().transpose(2,0,1).reshape(D*d,D)
 
         XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
 
@@ -435,7 +430,7 @@ count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 15
+D = 64
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
@@ -485,6 +480,12 @@ while ep > tol and count < 1000:
     print(count, end='\t')
 
     AL, AR, C, Hl, Hr, e, epl, epr, x = vumps(AL,AR,C,h,Hl,Hr,ep)
+
+    print('left iso', spla.norm(nc([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+    print('right iso', spla.norm(nc([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+    print('norm', nc([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+    print('ALC - CAR', spla.norm(nc([AL,C],[[-1,-2,1],[1,-3]]) - nc([C,AR],[[-2,1], [-1,1,-3]])))
+    print()
 
     ep = np.maximum(epl,epr)
 
