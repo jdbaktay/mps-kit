@@ -181,17 +181,18 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
 def Apply_HC(AL,AR,h,Hl,Hr,X):
     X = X.reshape(D, D)
 
-    tensors = [AL, X, AR, h, AL.conj(), AR.conj()]
-    indices = [(3, 7, 1), (1, 2), (4, 2, 8), (5, 6, 3, 4), (5, 7, -1), (6, -2, 8)]
-    contord = [7, 3, 5, 1, 2, 8, 4, 6]
-    H1 = nc(tensors, indices, contord)
+    # tensors = [AL, X, AR, h, AL.conj(), AR.conj()]
+    # indices = [(3, 7, 1), (1, 2), (4, 2, 8), (5, 6, 3, 4), (5, 7, -1), (6, -2, 8)]
+    # contord = [7, 3, 5, 1, 2, 8, 4, 6]
+    # H1 = nc(tensors, indices, contord)
 
-    # t = td(AL, X, axes=(2,0))
-    # t = td(t, AL.conj(), axes=(1,1))
-    # t = td(t, h, axes=([2,0], [0,2]))
-    # t = td(t, AR, axes=([0,3], [1,0]))
-    # t = td(t, AR.conj(), axes=([2,1], [2,0]))
-    # H1 = t
+    t = AL.reshape(d*D,D)@X@AR.transpose(1,0,2).reshape(D,d*D)
+    t = h.reshape(d**2,d**2)@t.reshape(d,D,d,D).transpose(0,2,1,3).reshape(d**2,D*D)
+    t = t.reshape(d,d,D,D).transpose(0,2,1,3).reshape(d*D,d*D)
+    t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t@AR.conj().transpose(0,2,1).reshape(d*D,D)
+    H1 = t
+
+    # print('check ',spla.norm(H1 - t))
 
     H2 = Hl @ X
     H3 = X @ Hr
@@ -201,37 +202,17 @@ def Apply_HC(AL,AR,h,Hl,Hr,X):
 def Apply_HAC(hL_mid,hR_mid,Hl,Hr,X):
     X = X.reshape(D, d, D)
 
-    # tensors = [hL_mid, X]
-    # indices = [(-1, -2, 1, 2), (1, 2, -3)]
-    # H1 = nc(tensors, indices)
-
     t = hL_mid.reshape(D*d,D*d)@X.reshape(D*d,D)
-    t = t.reshape(D,d,D)
-    H1 = t
-
-    # tensors = [X, hR_mid]
-    # indices = [(-1, 2, 1), (-2, -3, 2, 1)]
-    # H2 = nc(tensors, indices)
+    H1 = t.reshape(D,d,D)
 
     t = X.reshape(D,d*D)@hR_mid.reshape(d*D,d*D).transpose(1,0)
-    t = t.reshape(D,d,D)
-    H2 = t
-
-    # tensors = [Hl, X]
-    # indices = [(-1, 1), (1, -2, -3)]
-    # H3 = nc(tensors, indices)
+    H2 = t.reshape(D,d,D)
 
     t = Hl@X.reshape(D,d*D)
-    t = t.reshape(D,d,D)
-    H3 = t
-
-    # tensors = [X, Hr]
-    # indices = [(-1, -2, 1), (1, -3)]
-    # H4 = nc(tensors, indices)
+    H3 = t.reshape(D,d,D)
 
     t = X.reshape(D*d,D)@Hr
-    t = t.reshape(D,d,D)
-    H4 = t
+    H4 = t.reshape(D,d,D)
 
     return (H1 + H2 + H3 + H4).ravel()
 
