@@ -82,9 +82,9 @@ def left_ortho(A,X0,D,tol):
     l = l/np.trace(l)
 
     w, v = spla.eigh(l)
-    l = v@np.diag(np.abs(w))@v.T.conj()
 
-    L = spla.cholesky(l, lower=False)
+    L = np.sqrt(np.diag(np.abs(w)))@v.T.conj()
+
     Li = spla.inv(L)
 
     AL = nc([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
@@ -611,10 +611,15 @@ Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 AL, C = left_ortho(A,C,D, tol/100)
 AR, C = right_ortho(AL,C,D, tol/100)
 
+print('left iso', spla.norm(nc([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+print('right iso', spla.norm(nc([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+print('norm', nc([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+print('ALC - CAR', spla.norm(nc([AL,C],[[-1,-2,1],[1,-3]]) - nc([C,AR],[[-2,1], [-1,1,-3]])))
+
 AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
 
-AL, C = left_ortho(AR,C,D, tol/100)
-AR, C = right_ortho(AL,C,D, tol/100)
+AL, C = left_ortho(AR, C, D, tol/100)
+AR, C = right_ortho(AL, C, D, tol/100)
 
 while ep > tol and count < 400:
     print(count)
@@ -630,7 +635,7 @@ while ep > tol and count < 400:
     error.append(ep)
     discard_weight.append(x)
 
-    AL, C = left_ortho(AR, C, D, tol / 100)
+    AL, C = left_ortho(AR, C, D, tol/100)
     
     count += 1
 
