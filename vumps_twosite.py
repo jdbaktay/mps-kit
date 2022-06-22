@@ -78,7 +78,7 @@ def left_ortho(A,X0,tol):
 
     w, v = spla.eigh(l)
 
-    L = np.sqrt(np.diag(np.abs(w)))@v.T.conj()
+    L = np.sqrt(np.diag(np.abs(w))) @ v.T.conj()
 
     Li = spla.inv(L)
 
@@ -214,9 +214,6 @@ def calc_new_A(AL,AR,AC,C):
     epl = spla.norm(Bl)
     epr = spla.norm(Br)
 
-    print('epl', epl)
-    print('epr', epr)
-
     ulAC, plAC = spla.polar(AC.reshape(D * d, D), side='right')
     urAC, prAC = spla.polar(AC.reshape(D, d * D), side='left')
 
@@ -247,18 +244,16 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     g = functools.partial(Apply_HAC, hL_mid, hR_mid, Hl, Hr)
 
     H = spspla.LinearOperator((D*D,D*D), matvec=f)
-    w, v = spspla.eigsh(H, k=1, which='SR', v0=C.ravel(), tol=ep/100, return_eigenvectors=True)
+    w, v = spspla.eigsh(H, k=1, which='SA', v0=C.ravel(), tol=ep/100)
     C = v[:,0].reshape(D,D)
 
     H = spspla.LinearOperator((D*d*D,D*d*D), matvec=g)
-    w, v = spspla.eigsh(H, k=1, which='SR', v0=AC.ravel(), tol=ep/100, return_eigenvectors=True)
+    w, v = spspla.eigsh(H, k=1, which='SA', v0=AC.ravel(), tol=ep/100)
     AC = v[:,0].reshape(D,d,D)
 
     epl, epr, AL, AR = calc_new_A(AL,AR,AC,C)
 
-    x = calc_discard_weight(AL,AR,C,h,Hl,Hr)
-
-    return AL, AR, C, Hl, Hr, e, epl, epr, x
+    return AL, AR, C, Hl, Hr, e, epl, epr
 
 def calc_entent(C):
     s = spla.svdvals(C)
@@ -283,10 +278,11 @@ def calc_fidelity(X,Y):
     return np.max(np.abs(evals))
 
 def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
+
+    stat_struc_fact = []
   
     q = np.linspace(0,np.pi,N)
 
-    stat_struc_fact = []
     AC = np.tensordot(AL, C, axes=(2,0))
 
     o1 = o1 - ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
@@ -353,9 +349,10 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
 
 def calc_momentum(AL,AR,C,o1,o2,o3,N):
 
+    momentum = []
+
     q = np.linspace(0,np.pi,N)
 
-    momentum = []
     AC = np.tensordot(AL, C, axes=(2,0))
 
     tensors = [AC, o1, o2, AC.conj()]
@@ -419,13 +416,12 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
 
 energy = []
 error = []
-discard_weight = []
 
 count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 48
+D = 64
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
@@ -474,12 +470,14 @@ AR, C = right_ortho(AL, C, tol/100)
 while ep > tol and count < 1000:
     print(count)
 
-    AL, AR, C, Hl, Hr, e, epl, epr, x = vumps(AL,AR,C,h,Hl,Hr,ep)
+    AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL,AR,C,h,Hl,Hr,ep)
 
     print('left iso', spla.norm(ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
     print('right iso', spla.norm(ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
     print('norm', ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
     print('ALC - CAR', spla.norm(ncon([AL,C],[[-1,-2,1],[1,-3]]) - ncon([C,AR],[[-2,1], [-1,1,-3]])))
+    print('epl', epl)
+    print('epr', epr)
 
     ep = np.maximum(epl,epr)
 
@@ -488,12 +486,12 @@ while ep > tol and count < 1000:
 
     energy.append(e)
     error.append(ep)
-    discard_weight.append(x)
 
     print()
     
     count += 1
 
+print('discarded weight', calc_discard_weight(AL,AR,C,h,Hl,Hr))
 
 plt.plot(np.array(energy).real)
 plt.show()
@@ -501,17 +499,14 @@ plt.show()
 plt.plot(np.array(error))
 plt.show()
 
-plt.plot(np.array(discard_weight))
-plt.show()
-
 q, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None,N)
-# np.savetxt('s_D' + str(D) + '.dat', np.column_stack(stat_struc_fact), fmt=' %s')
+# np.savetxt('ss_D' + str(D) + '.dat', np.column_stack((q, stat_struc_fact)), fmt='%s %s')
 plt.plot(q, stat_struc_fact)
 plt.xticks(np.linspace(0, 1, 5)*np.pi)
 plt.grid(); plt.show()
 
 q, momentum = calc_momentum(AL,AR,C,sp, sm, -sz,N)
-# np.savetxt('n_D' + str(D) + '.dat', np.column_stack(momentum), fmt=' %s')
+# np.savetxt('nn_D' + str(D) + '.dat', np.column_stack((q, momentum)), fmt='%s %s')
 plt.plot(q, momentum)
 plt.xticks(np.linspace(0, 1, 5)*np.pi)
 plt.grid(); plt.show()
