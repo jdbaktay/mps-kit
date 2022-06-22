@@ -390,6 +390,11 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     return q, np.array(momentum)
 
 def padding(A, dims):
+    '''
+    dims is a tuple with the new dimensions of the tensor A.
+    use to expand NOT shrink the dimension of AL, AR, C, HL, HR
+
+    '''
     if A.shape != dims:
         for k in range(len(dims)):
             if A.shape[k] != dims[k]:
@@ -422,7 +427,6 @@ def dynamic_expansion(AL, AR, C, Hl, Hr):
 
     C = padding(C, (D, D))
     print('expanded C', C.shape)
-    print('norm of C', np.trace(C.T.conj()@C))
 
     Hl, Hr = padding(Hl, (D, D)), padding(Hr, (D, D))
 
