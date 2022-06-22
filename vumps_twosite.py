@@ -44,46 +44,51 @@ def right_ortho(A, X0, tol):
     A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
     return A, L
 
-def calc_discard_weight(AL, AR, C, h, Hl, Hr):
-    def eff_ham(X):
-        X = X.reshape(d,D,d,D)
+def padding(A, dims):
+    '''
+    dims is a tuple with the new dimensions of the tensor A.
+    use to expand NOT shrink the dimension of AL, AR, C, HL, HR
 
-        tensors = [AL, X, h, AL.conj()]
-        indices = [(4,1,2), (5,2,-3,-4), (3,-1,4,5),(3,1,-2)]
-        contord = [1,2,3,4,5]
-        H1 = nc.ncon(tensors,indices,contord)
+    '''
+    if A.shape != dims:
+        for k in range(len(dims)):
+            if A.shape[k] != dims[k]:
+                ind_exp = list(range(-1, -len(dims) - 1, -1))
+                ind_exp[k] = 1
+                tensors = [A, np.eye(A.shape[k], dims[k])]
+                indices = [ind_exp, (1, -k - 1)]
+                A = nc.ncon(tensors, indices)
+    return A
 
-        tensors = [X, h]
-        indices = [(1,-2,2,-4), (-1,-3,1,2)]
-        contord = [1,2]
-        H2 = nc.ncon(tensors,indices,contord)
+def isometrize(A, side=str):
+    if side == 'left':
+        A = A.reshape(d*D,D)
+        u, s, vh = spla.svd(A, full_matrices=False)
+        A = (u @ vh).reshape(d,D,D)
+    if side == 'right':
+        A = A.transpose(1,0,2).reshape(D,d*D)
+        u, s, vh = spla.svd(A, full_matrices=False)
+        A = (u @ vh).reshape(D,d,D).transpose(1,0,2)
+    return A
 
-        tensors = [X, AR, h, AR.conj()]
-        indices = [(-1,-2,4,2), (5,2,1), (-3,3,4,5), (3,-4,1)]
-        contord = [1,2,3,4,5]
-        H3 = nc.ncon(tensors,indices,contord)
+def dynamic_expansion(AL, AR, C, Hl, Hr):
+    AL = padding(AL, (d, D, D))
+    AL = isometrize(AL, side='left')
+    print('expanded AL', AL.shape)
 
-        tensors = [Hl, X]
-        indices = [(-2,1),(-1,1,-3,-4)]
-        H4 = nc.ncon(tensors,indices)
+    AR = padding(AR, (d, D, D))
+    AR = isometrize(AR, side='right')
+    print('expanded AR', AR.shape)
 
-        tensors = [X, Hr]
-        indices = [(-1,-2,-3,1),(1,-4)]
-        H5 = nc.ncon(tensors,indices)
-        return (H1+H2+H3+H4+H5).ravel()
+    C = padding(C, (D, D))
+    print('expanded C', C.shape)
 
-    two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
+    Hl, Hr = padding(Hl, (D, D)), padding(Hr, (D, D))
 
-    H = spspla.LinearOperator((d*D*d*D,d*D*d*D), matvec=eff_ham)
-
-    w, v = spspla.eigsh(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
-
-    s = spla.svdvals(v[:,0].reshape(d*D,d*D))
-
-    t = 0
-    for i in range(D,d*D):
-        t += s[i]**2        
-    return t
+    print('new left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+    print('new right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+    print('new norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+    return AL, AR, C, Hl, Hr
 
 def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, h, AL.conj(), AL.conj()]
@@ -240,6 +245,47 @@ def vumps(AL, AR, C, h, Hl, Hr, ep):
     epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
 
+def calc_discard_weight(AL, AR, C, h, Hl, Hr):
+    def eff_ham(X):
+        X = X.reshape(d,D,d,D)
+
+        tensors = [AL, X, h, AL.conj()]
+        indices = [(4,1,2), (5,2,-3,-4), (3,-1,4,5),(3,1,-2)]
+        contord = [1,2,3,4,5]
+        H1 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, h]
+        indices = [(1,-2,2,-4), (-1,-3,1,2)]
+        contord = [1,2]
+        H2 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, AR, h, AR.conj()]
+        indices = [(-1,-2,4,2), (5,2,1), (-3,3,4,5), (3,-4,1)]
+        contord = [1,2,3,4,5]
+        H3 = nc.ncon(tensors,indices,contord)
+
+        tensors = [Hl, X]
+        indices = [(-2,1),(-1,1,-3,-4)]
+        H4 = nc.ncon(tensors,indices)
+
+        tensors = [X, Hr]
+        indices = [(-1,-2,-3,1),(1,-4)]
+        H5 = nc.ncon(tensors,indices)
+        return (H1+H2+H3+H4+H5).ravel()
+
+    two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
+
+    H = spspla.LinearOperator((d*D*d*D,d*D*d*D), matvec=eff_ham)
+
+    w, v = spspla.eigsh(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
+
+    s = spla.svdvals(v[:,0].reshape(d*D,d*D))
+
+    t = 0
+    for i in range(D,d*D):
+        t += s[i]**2        
+    return t
+
 def calc_entent(C):
     s = spla.svdvals(C)
 
@@ -389,52 +435,6 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
         momentum.append(s.real)
     return q, np.array(momentum)
 
-def padding(A, dims):
-    '''
-    dims is a tuple with the new dimensions of the tensor A.
-    use to expand NOT shrink the dimension of AL, AR, C, HL, HR
-
-    '''
-    if A.shape != dims:
-        for k in range(len(dims)):
-            if A.shape[k] != dims[k]:
-                ind_exp = list(range(-1, -len(dims) - 1, -1))
-                ind_exp[k] = 1
-                tensors = [A, np.eye(A.shape[k], dims[k])]
-                indices = [ind_exp, (1, -k - 1)]
-                A = nc.ncon(tensors, indices)
-    return A
-
-def isometrize(A, side=str):
-    if side == 'left':
-        A = A.reshape(d*D,D)
-        u, s, vh = spla.svd(A, full_matrices=False)
-        A = (u @ vh).reshape(d,D,D)
-    if side == 'right':
-        A = A.transpose(1,0,2).reshape(D,d*D)
-        u, s, vh = spla.svd(A, full_matrices=False)
-        A = (u @ vh).reshape(D,d,D).transpose(1,0,2)
-    return A
-
-def dynamic_expansion(AL, AR, C, Hl, Hr):
-    AL = padding(AL, (d, D, D))
-    AL = isometrize(AL, side='left')
-    print('expanded AL', AL.shape)
-
-    AR = padding(AR, (d, D, D))
-    AR = isometrize(AR, side='right')
-    print('expanded AR', AR.shape)
-
-    C = padding(C, (D, D))
-    print('expanded C', C.shape)
-
-    Hl, Hr = padding(Hl, (D, D)), padding(Hr, (D, D))
-
-    print('new left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-    print('new right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-    print('new norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-    return AL, AR, C, Hl, Hr
-
 energy, error = [], []
 
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
@@ -490,20 +490,19 @@ while (ep > tol or D != Dmax) and count < 1500:
 
         AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr)
 
-
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL,AR,C,h,Hl,Hr,ep)
 
     print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
     print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
     print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
     print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
+    print('energy', e)
     print('epl', epl)
     print('epr', epr)
 
     ep = np.maximum(epl,epr)
 
     print('ep ', ep)
-    print('energy', e)
 
     energy.append(e)
     error.append(ep)
@@ -515,19 +514,20 @@ print('discarded weight', calc_discard_weight(AL,AR,C,h,Hl,Hr))
 print('final AL', AL.shape)
 print('final AR', AR.shape)
 
+q, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None,N)
+q, momentum = calc_momentum(AL,AR,C,sp, sm, -sz,N)
+
 plt.plot(np.array(energy).real)
 plt.show()
 
 plt.plot(np.array(error))
 plt.show()
 
-q, stat_struc_fact = calc_stat_struc_fact(AL,AR,C,n,n,None,N)
 # np.savetxt('ss_D' + str(D) + '.dat', np.column_stack((q, stat_struc_fact)), fmt='%s %s')
 plt.plot(q, stat_struc_fact)
 plt.xticks(np.linspace(0, 1, 5)*np.pi)
 plt.grid(); plt.show()
 
-q, momentum = calc_momentum(AL,AR,C,sp, sm, -sz,N)
 # np.savetxt('nn_D' + str(D) + '.dat', np.column_stack((q, momentum)), fmt='%s %s')
 plt.plot(q, momentum)
 plt.xticks(np.linspace(0, 1, 5)*np.pi)
