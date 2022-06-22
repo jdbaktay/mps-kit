@@ -17,21 +17,18 @@ def left_ortho(A, X0, tol):
             contord = [2, 3, 1]
             return nc.ncon(tensors,indices,contord).ravel()
 
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-
+        E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
         evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
-
         return evals[0], evecs[:,0].reshape(D, D)
 
     norm, l = left_fixed_point(A, A)
 
-    A = A/np.sqrt(norm)
-
     l = 0.5*(l + l.T.conj())
     l = l/np.trace(l)
 
-    w, v = spla.eigh(l)
+    A = A/np.sqrt(norm)
 
+    w, v = spla.eigh(l)
     L = np.sqrt(np.diag(np.abs(w))) @ v.T.conj()
 
     Li = spla.inv(L)
@@ -62,13 +59,14 @@ def padding(A, dims):
 
 def isometrize(A, side=str):
     if side == 'left':
-        A = A.reshape(d*D, D)
+        A = A.reshape(d * D, D)
         u, s, vh = spla.svd(A, full_matrices=False)
         A = (u @ vh).reshape(d, D, D)
+    
     if side == 'right':
-        A = A.transpose(1,0,2).reshape(D, d*D)
+        A = A.transpose(1, 0, 2).reshape(D, d * D)
         u, s, vh = spla.svd(A, full_matrices=False)
-        A = (u @ vh).reshape(D, d, D).transpose(1,0,2)
+        A = (u @ vh).reshape(D, d, D).transpose(1, 0, 2)
     return A
 
 def dynamic_expansion(AL, AR, C, Hl, Hr):
@@ -117,8 +115,8 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     def left_env(X):
         X = X.reshape(D, D)
 
-        t = X @ AL.transpose(1,0,2).reshape(D, d*D)
-        XT = AL.conj().transpose(2,1,0).reshape(D, D*d) @ t.reshape(D*d, D)
+        t = X @ AL.transpose(1, 0, 2).reshape(D, d * D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t.reshape(D * d, D)
 
         XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
         return (X - XT + XR).ravel()
@@ -126,9 +124,9 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     def right_env(X):
         X = X.reshape(D, D)
 
-        t = AR.reshape(d*D, D) @ X
-        t = t.reshape(d, D, D).transpose(1,2,0).reshape(D, D*d)
-        XT = t @ AR.conj().transpose(2,0,1).reshape(D*d, D)
+        t = AR.reshape(d * D, D) @ X
+        t = t.reshape(d, D, D).transpose(1, 2, 0).reshape(D, D * d)
+        XT = t @ AR.conj().transpose(2, 0, 1).reshape(D * d, D)
 
         XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
         return (X - XT + XL).ravel()
@@ -160,10 +158,10 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
 def Apply_HC(AL, AR, h, Hl, Hr, X):
     X = X.reshape(D, D)
 
-    t = AL.reshape(d*D, D) @ X @ AR.transpose(1,0,2).reshape(D, d*D)
-    t = h.reshape(d**2, d**2) @ t.reshape(d, D, d, D).transpose(0,2,1,3).reshape(d**2, D*D)
-    t = t.reshape(d, d, D, D).transpose(0,2,1,3).reshape(d*D, d*D)
-    H1 = AL.conj().transpose(2,0,1).reshape(D, d*D) @ t @ AR.conj().transpose(0,2,1).reshape(d*D, D)
+    t = AL.reshape(d * D, D) @ X @ AR.transpose(1, 0, 2).reshape(D, d * D)
+    t = h.reshape(d**2, d**2) @ t.reshape(d, D, d, D).transpose(0,2,1,3).reshape(d**2, D * D)
+    t = t.reshape(d, d, D, D).transpose(0, 2, 1, 3).reshape(d * D, d * D)
+    H1 = AL.conj().transpose(2, 0, 1).reshape(D, d * D) @ t @ AR.conj().transpose(0,2,1).reshape(d * D, D)
 
     H2 = Hl @ X
     H3 = X @ Hr
@@ -172,22 +170,22 @@ def Apply_HC(AL, AR, h, Hl, Hr, X):
 def Apply_HAC(hL_mid, hR_mid, Hl, Hr, X):
     X = X.reshape(D, d, D)
 
-    t = hL_mid.reshape(D*d, D*d) @ X.reshape(D*d, D)
+    t = hL_mid.reshape(D * d, D * d) @ X.reshape(D * d, D)
     H1 = t.reshape(D, d, D)
 
-    t = X.reshape(D, d*D) @ hR_mid.reshape(d*D, d*D).transpose(1,0)
+    t = X.reshape(D, d * D) @ hR_mid.reshape(d * D, d * D).transpose(1, 0)
     H2 = t.reshape(D, d, D)
 
-    t = Hl @ X.reshape(D, d*D)
+    t = Hl @ X.reshape(D, d * D)
     H3 = t.reshape(D, d, D)
 
-    t = X.reshape(D*d, D ) @ Hr
+    t = X.reshape(D * d, D ) @ Hr
     H4 = t.reshape(D, d, D)
     return (H1 + H2 + H3 + H4).ravel()
 
 def calc_new_A(AL, AR, AC, C):
     Al = AL.reshape(d * D, D)
-    Ar = AR.transpose(1,0,2).reshape(D, d * D)
+    Ar = AR.transpose(1, 0, 2).reshape(D, d * D)
 
     def calcnullspace(n):
         u,s,vh = spla.svd(n, full_matrices=True)
@@ -200,7 +198,7 @@ def calc_new_A(AL, AR, AC, C):
     _, Al_right_null = calcnullspace(Al.T.conj())
     Ar_left_null, _  = calcnullspace(Ar.T.conj())
 
-    Bl = Al_right_null.T.conj() @ AC.transpose(1,0,2).reshape(d * D, D)
+    Bl = Al_right_null.T.conj() @ AC.transpose(1, 0, 2).reshape(d * D, D)
     Br = AC.reshape(D, d * D) @ Ar_left_null.T.conj()
 
     epl = spla.norm(Bl)
@@ -275,7 +273,7 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
 
     two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
 
-    H = spspla.LinearOperator((d*D*d*D, d*D*d*D), matvec=eff_ham)
+    H = spspla.LinearOperator((d * D * d * D, d * D * d * D), matvec=eff_ham)
 
     w, v = spspla.eigsh(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
 
@@ -301,7 +299,7 @@ def calc_fidelity(X, Y):
     Presumes that MPS tensors X and Y are both properly normalized
 
     '''
-    E = np.tensordot(X,Y.conj(),axes=(0,0)).transpose(0,2,1,3).reshape(D*D,D*D)
+    E = np.tensordot(X,Y.conj(),axes=(0, 0)).transpose(0, 2, 1, 3).reshape(D * D, D * D)
 
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
     return np.max(np.abs(evals))
@@ -356,8 +354,8 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     for i in range(N):
         p = q[i]
 
-        left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
-        right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
+        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
+        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
         L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
         R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
@@ -419,8 +417,8 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     for i in range(N):
         p = q[i]
 
-        left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
-        right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
+        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
+        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
         L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
         R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
@@ -464,7 +462,7 @@ TFI = -np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
 tVV2 = -t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
 
 h = XYZ
-h = h.reshape(d,d,d,d)
+h = h.reshape(d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5
@@ -530,12 +528,12 @@ plt.show()
 
 # np.savetxt('ss_D' + str(D) + '.dat', np.column_stack((q, stat_struc_fact)), fmt='%s %s')
 plt.plot(q, stat_struc_fact)
-plt.xticks(np.linspace(0, 1, 5)*np.pi)
+plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
 # np.savetxt('nn_D' + str(D) + '.dat', np.column_stack((q, momentum)), fmt='%s %s')
 plt.plot(q, momentum)
-plt.xticks(np.linspace(0, 1, 5)*np.pi)
+plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
 # model = 'tVV2'
