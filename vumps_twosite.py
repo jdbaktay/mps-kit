@@ -1,6 +1,6 @@
 #cd Desktop/all/research/code/dMPS-TDVP
 
-from ncon import ncon
+import ncon as nc
 import numpy as np
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
@@ -17,29 +17,29 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
         tensors = [AL, X, h, AL.conj()]
         indices = [(4,1,2), (5,2,-3,-4), (3,-1,4,5),(3,1,-2)]
         contord = [1,2,3,4,5]
-        H1 = ncon(tensors,indices,contord)
+        H1 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, h]
         indices = [(1,-2,2,-4), (-1,-3,1,2)]
         contord = [1,2]
-        H2 = ncon(tensors,indices,contord)
+        H2 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, AR, h, AR.conj()]
         indices = [(-1,-2,4,2), (5,2,1), (-3,3,4,5), (3,-4,1)]
         contord = [1,2,3,4,5]
-        H3 = ncon(tensors,indices,contord)
+        H3 = nc.ncon(tensors,indices,contord)
 
         tensors = [Hl, X]
         indices = [(-2,1),(-1,1,-3,-4)]
-        H4 = ncon(tensors,indices)
+        H4 = nc.ncon(tensors,indices)
 
         tensors = [X, Hr]
         indices = [(-1,-2,-3,1),(1,-4)]
-        H5 = ncon(tensors,indices)
+        H5 = nc.ncon(tensors,indices)
 
         return (H1+H2+H3+H4+H5).ravel()
 
-    two_site = ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
+    two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
 
     H = spspla.LinearOperator((d*D*d*D,d*D*d*D), matvec=eff_ham)
 
@@ -60,7 +60,7 @@ def left_ortho(A,X0,tol):
             tensors = [A, X.reshape(D, D), B.conj()]
             indices = [(1,2,-2), (3, 2), (1, 3, -1)]
             contord = [2, 3, 1]
-            return ncon(tensors,indices,contord).ravel()
+            return nc.ncon(tensors,indices,contord).ravel()
 
         E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
 
@@ -82,7 +82,7 @@ def left_ortho(A,X0,tol):
 
     Li = spla.inv(L)
 
-    AL = ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
+    AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
 
     return AL, L
 
@@ -96,13 +96,13 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     tensors = [AL, AL, h, AL.conj(), AL.conj()]
     indices = [(2, 7, 1), (3, 1, -2), (4, 5, 2, 3), (4, 7, 6), (5, 6, -1)]
     contord = [7, 2, 4, 1, 3, 6, 5]
-    hl = ncon(tensors, indices, contord)
+    hl = nc.ncon(tensors, indices, contord)
     el = np.trace(hl @ C @ C.T.conj())
 
     tensors = [AR, AR, h, AR.conj(), AR.conj()]
     indices = [(2, -1, 1), (3, 1, 7), (4, 5, 2, 3), (4, -2, 6), (5, 6, 7)]
     contord = [7, 3, 5, 1, 2, 6, 4]
-    hr = ncon(tensors, indices, contord)
+    hr = nc.ncon(tensors, indices, contord)
     er = np.trace(C.T.conj() @ C @ hr)
 
     e = 0.5 * (el + er)
@@ -233,12 +233,12 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     tensors = [AL, h, AL.conj()]
     indices = [(2, 1, -3), (3, -2, 2, -4), (3, 1, -1)]
     contord = [1, 2, 3]
-    hL_mid = ncon(tensors, indices, contord)
+    hL_mid = nc.ncon(tensors, indices, contord)
 
     tensors = [AR, h, AR.conj()]
     indices = [(2, -4, 1), (-1, 3, -3, 2), (3, -2, 1)]
     contord = [1, 2, 3]
-    hR_mid = ncon(tensors, indices, contord)
+    hR_mid = nc.ncon(tensors, indices, contord)
 
     f = functools.partial(Apply_HC, AL, AR, h, Hl, Hr)
     g = functools.partial(Apply_HAC, hL_mid, hR_mid, Hl, Hr)
@@ -285,22 +285,22 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
-    o1 = o1 - ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o2 = o2 - ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
 
     tensors = [AC, o1, o2, AC.conj()]
     indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
-    s1 = ncon(tensors, indices, contord)
+    s1 = nc.ncon(tensors, indices, contord)
     print('s --> s1', s1)
 
     def left(X,o,Y):
         indices =[(2,1,-2), (3,2), (3,1,-1)]
-        return ncon([X, o, Y.conj()], indices, [1,2,3])
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     def right(X,o,Y):
         indices =[(2,-1,1), (3,2), (3,-2,1)]
-        return ncon([X, o, Y.conj()], indices, [1,2,3])
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     s2l, s2r = left(AC,o1,AL), right(AR,o2,AC)
     s3l, s3r = left(AL,o2,AC), right(AC,o1,AR)
@@ -311,7 +311,7 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
         tensors = [X, AR, AL.conj()]
         indices = [(1, 2), (3, 2, -2), (3, 1, -1)]
         contord = [2, 3, 1]
-        XT = ncon(tensors, indices, contord)
+        XT = nc.ncon(tensors, indices, contord)
 
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
@@ -321,7 +321,7 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
         tensors = [AL, AR.conj(), X]
         indices = [(3, -1, 2), (3, -2, 1), (2, 1)]
         contord = [2, 3, 1]
-        XT = ncon(tensors, indices, contord)
+        XT = nc.ncon(tensors, indices, contord)
 
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
@@ -358,16 +358,16 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
     tensors = [AC, o1, o2, AC.conj()]
     indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
-    s1 = ncon(tensors, indices, contord)
+    s1 = nc.ncon(tensors, indices, contord)
     print('n --> s1', s1)
 
     def left(X,o,Y):
         indices =[(2,1,-2), (3,2), (3,1,-1)]
-        return ncon([X, o, Y.conj()], indices, [1,2,3])
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     def right(X,o,Y):
         indices =[(2,-1,1), (3,2), (3,-2,1)]
-        return ncon([X, o, Y.conj()], indices, [1,2,3])
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     s2l, s2r = left(AC,o1,AL), right(AR,o2,AC)
     s3l, s3r = left(AL,o2,AC), right(AC,o1,AR)
@@ -378,7 +378,7 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
         tensors = [X, AR, o3, AL.conj()]
         indices = [(1, 2), (3, 2, -2), (4,3) , (4, 1, -1)]
         contord = [2, 3, 4, 1]
-        XT = ncon(tensors, indices, contord)
+        XT = nc.ncon(tensors, indices, contord)
 
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
@@ -388,7 +388,7 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
         tensors = [AL, o3, AR.conj(), X]
         indices = [(3, -1, 2), (4,3), (4, -2, 1), (2, 1)]
         contord = [2, 3, 4, 1]
-        XT = ncon(tensors, indices, contord)
+        XT = nc.ncon(tensors, indices, contord)
 
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
@@ -414,38 +414,39 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
 
     return q, np.array(momentum)
 
-energy = []
-error = []
+def padding(A, dims):
+    if A.shape != dims:
+        for k in range(len(dims)):
+            if A.shape[k] != dims[k]:
+                ind_exp = list(range(-1, -len(dims) - 1, -1))
+                ind_exp[k] = 1
+                tensors = [A, np.eye(A.shape[k], dims[k])]
+                indices = [ind_exp, (1, -k - 1)]
+                A = nc.ncon(tensors, indices)
+    return A
+
+energy, error = [], []
 
 count, tol, ep = 0, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 64
+D = 16
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
 sy, sz = np.array([[0, -1j],[1j, 0]]), np.array([[1, 0],[0, -1]])
 sp, sm, n = 0.5*(sx + 1.0j*sy), 0.5*(sx - 1.0j*sy), 0.5*(sz + np.eye(d))
 
-x = 1
-y = 1
-z = 0
+x, y, z = 1, 1, 0
 
-t  = 1
-V  = 0
-V2 = 0
-##################################################
+t, V, V2  = 1, 0 ,0
 
 XYZ = -(x*np.kron(sx, sx) + y*np.kron(sy, sy) - z*np.kron(sz, sz)) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
-
-XY  = -x*np.kron(sx, sx) - y*np.kron(sy, sy)
 
 TFI = -np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
 
 tVV2 = -t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
-
-####################################################
 
 h = XYZ
 h = h.reshape(d,d,d,d)
@@ -457,10 +458,10 @@ Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 AL, C = left_ortho(A, C, tol/100)
 AR, C = right_ortho(AL, C, tol/100)
 
-print('left iso', spla.norm(ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-print('right iso', spla.norm(ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-print('norm', ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-print('ALC - CAR', spla.norm(ncon([AL,C],[[-1,-2,1],[1,-3]]) - ncon([C,AR],[[-2,1], [-1,1,-3]])))
+print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
 
 AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
 
@@ -472,10 +473,10 @@ while ep > tol and count < 1000:
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL,AR,C,h,Hl,Hr,ep)
 
-    print('left iso', spla.norm(ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-    print('right iso', spla.norm(ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-    print('norm', ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-    print('ALC - CAR', spla.norm(ncon([AL,C],[[-1,-2,1],[1,-3]]) - ncon([C,AR],[[-2,1], [-1,1,-3]])))
+    print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+    print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+    print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+    print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
     print('epl', epl)
     print('epr', epr)
 
@@ -486,8 +487,6 @@ while ep > tol and count < 1000:
 
     energy.append(e)
     error.append(ep)
-
-    print()
     
     count += 1
 
