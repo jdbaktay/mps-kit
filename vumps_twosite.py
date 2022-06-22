@@ -9,8 +9,42 @@ import functools
 import sys
 import os
 
-def calc_discard_weight(AL,AR,C,h,Hl,Hr):
+def left_ortho(A, X0, tol):
+    def left_fixed_point(A, B):
+        def left_transfer_op(X):
+            tensors = [A, X.reshape(D, D), B.conj()]
+            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
+            contord = [2, 3, 1]
+            return nc.ncon(tensors,indices,contord).ravel()
 
+        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
+
+        evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
+
+        return evals[0], evecs[:,0].reshape(D,D)
+
+    norm, l = left_fixed_point(A, A)
+
+    A = A/np.sqrt(norm)
+
+    l = 0.5*(l + l.T.conj())
+    l = l/np.trace(l)
+
+    w, v = spla.eigh(l)
+
+    L = np.sqrt(np.diag(np.abs(w))) @ v.T.conj()
+
+    Li = spla.inv(L)
+
+    AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
+    return AL, L
+
+def right_ortho(A, X0, tol):
+    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol)
+    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
+    return A, L
+
+def calc_discard_weight(AL, AR, C, h, Hl, Hr):
     def eff_ham(X):
         X = X.reshape(d,D,d,D)
 
@@ -36,7 +70,6 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
         tensors = [X, Hr]
         indices = [(-1,-2,-3,1),(1,-4)]
         H5 = nc.ncon(tensors,indices)
-
         return (H1+H2+H3+H4+H5).ravel()
 
     two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
@@ -49,50 +82,10 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
 
     t = 0
     for i in range(D,d*D):
-        t += s[i]**2
-        
+        t += s[i]**2        
     return t
 
-def left_ortho(A,X0,tol):
-
-    def left_fixed_point(A,B):
-        def left_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            contord = [2, 3, 1]
-            return nc.ncon(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-
-        evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
-
-        return evals[0], evecs[:,0].reshape(D,D)
-
-    norm, l = left_fixed_point(A,A)
-
-    A = A/np.sqrt(norm)
-
-    l = 0.5*(l + l.T.conj())
-
-    l = l/np.trace(l)
-
-    w, v = spla.eigh(l)
-
-    L = np.sqrt(np.diag(np.abs(w))) @ v.T.conj()
-
-    Li = spla.inv(L)
-
-    AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
-
-    return AL, L
-
-def right_ortho(A, X0, tol):
-    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol)
-    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))
-    return A, L
-
-def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
-
+def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, h, AL.conj(), AL.conj()]
     indices = [(2, 7, 1), (3, 1, -2), (4, 5, 2, 3), (4, 7, 6), (5, 6, -1)]
     contord = [7, 2, 4, 1, 3, 6, 5]
@@ -123,7 +116,6 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
         XT = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,D)
 
         XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
-
         return (X - XT + XR).ravel()
 
     def right_env(X):
@@ -134,13 +126,12 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
         XT = t@AR.conj().transpose(2,0,1).reshape(D*d,D)
 
         XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
-
         return (X - XT + XL).ravel()
 
     Ol = spspla.LinearOperator((D**2,D**2), matvec=left_env)
     Or = spspla.LinearOperator((D**2,D**2), matvec=right_env)
 
-    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100, atol=ep/100) 
+    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100, atol=ep/100)
     Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100, atol=ep/100)
 
     Hl, Hr = Hl.reshape(D,D), Hr.reshape(D,D)
@@ -159,10 +150,9 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
 
     print('(L|Hr)', np.trace(C.T.conj()@C@Hr))
     print('(Hl|R)', np.trace(Hl@C@C.T.conj()))
-
     return Hl, Hr, e
 
-def Apply_HC(AL,AR,h,Hl,Hr,X):
+def Apply_HC(AL, AR, h, Hl, Hr, X):
     X = X.reshape(D, D)
 
     t = AL.reshape(d*D,D)@X@AR.transpose(1,0,2).reshape(D,d*D)
@@ -172,10 +162,9 @@ def Apply_HC(AL,AR,h,Hl,Hr,X):
 
     H2 = Hl @ X
     H3 = X @ Hr
-
     return (H1 + H2 + H3).ravel()
 
-def Apply_HAC(hL_mid,hR_mid,Hl,Hr,X):
+def Apply_HAC(hL_mid, hR_mid, Hl, Hr, X):
     X = X.reshape(D, d, D)
 
     t = hL_mid.reshape(D*d,D*d)@X.reshape(D*d,D)
@@ -189,11 +178,9 @@ def Apply_HAC(hL_mid,hR_mid,Hl,Hr,X):
 
     t = X.reshape(D*d,D)@Hr
     H4 = t.reshape(D,d,D)
-
     return (H1 + H2 + H3 + H4).ravel()
 
-def calc_new_A(AL,AR,AC,C):
-
+def calc_new_A(AL, AR, AC, C):
     Al = AL.reshape(d*D,D)
     Ar = AR.transpose(1,0,2).reshape(D,d*D)
 
@@ -222,10 +209,9 @@ def calc_new_A(AL,AR,AC,C):
 
     AL = (ulAC @ ulC.T.conj()).reshape(D, d, D).transpose(1, 0, 2)
     AR = (urC.T.conj() @ urAC).reshape(D, d, D).transpose(1, 0, 2)
-
     return epl, epr, AL, AR
 
-def vumps(AL,AR,C,h,Hl,Hr,ep):
+def vumps(AL, AR, C, h, Hl, Hr, ep):
     AC = np.tensordot(C, AR, axes=(1,1))
 
     Hl, Hr, e = HeffTerms(AL,AR,C,h,Hl,Hr,ep)
@@ -251,8 +237,7 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     w, v = spspla.eigsh(H, k=1, which='SA', v0=AC.ravel(), tol=ep/100)
     AC = v[:,0].reshape(D,d,D)
 
-    epl, epr, AL, AR = calc_new_A(AL,AR,AC,C)
-
+    epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
 
 def calc_entent(C):
@@ -263,22 +248,19 @@ def calc_entent(C):
     entent = 0
     for i in range(np.size(s)):
         entent -= s[i]**2 * np.log(s[i]**2)
-
     return entent, b 
 
 def calc_fidelity(X,Y):
-    '''Presumes that MPS tensors X and Y are both properly normalized'''
+    '''
+    Presumes that MPS tensors X and Y are both properly normalized
 
+    '''
     E = np.tensordot(X,Y.conj(),axes=(0,0)).transpose(0,2,1,3).reshape(D*D,D*D)
 
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
-
-    print(evals)
-    
     return np.max(np.abs(evals))
 
-def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
-
+def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
   
     q = np.linspace(0,np.pi,N)
@@ -312,7 +294,6 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
         indices = [(1, 2), (3, 2, -2), (3, 1, -1)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
@@ -322,7 +303,6 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
         indices = [(3, -1, 2), (3, -2, 1), (2, 1)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
@@ -344,11 +324,9 @@ def calc_stat_struc_fact(AL,AR,C,o1,o2,o3,N):
         s = s1+s2+s3
 
         stat_struc_fact.append(s.real)
-
     return q, np.array(stat_struc_fact)
 
-def calc_momentum(AL,AR,C,o1,o2,o3,N):
-
+def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
 
     q = np.linspace(0,np.pi,N)
@@ -379,7 +357,6 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
         indices = [(1, 2), (3, 2, -2), (4,3) , (4, 1, -1)]
         contord = [2, 3, 4, 1]
         XT = nc.ncon(tensors, indices, contord)
-
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
@@ -389,7 +366,6 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
         indices = [(3, -1, 2), (4,3), (4, -2, 1), (2, 1)]
         contord = [2, 3, 4, 1]
         XT = nc.ncon(tensors, indices, contord)
-
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
@@ -409,9 +385,8 @@ def calc_momentum(AL,AR,C,o1,o2,o3,N):
         s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
 
         s = s1+s2+s3
-        
-        momentum.append(s.real)
 
+        momentum.append(s.real)
     return q, np.array(momentum)
 
 def padding(A, dims):
@@ -425,13 +400,44 @@ def padding(A, dims):
                 A = nc.ncon(tensors, indices)
     return A
 
+def isometrize(A, side=str):
+    if side == 'left':
+        A = A.reshape(d*D,D)
+        u, s, vh = spla.svd(A, full_matrices=False)
+        A = (u @ vh).reshape(d,D,D)
+    if side == 'right':
+        A = A.transpose(1,0,2).reshape(D,d*D)
+        u, s, vh = spla.svd(A, full_matrices=False)
+        A = (u @ vh).reshape(D,d,D).transpose(1,0,2)
+    return A
+
+def dynamic_expansion(AL, AR, C, Hl, Hr):
+    AL = padding(AL, (d, D, D))
+    AL = isometrize(AL, side='left')
+    print('expanded AL', AL.shape)
+
+    AR = padding(AR, (d, D, D))
+    AR = isometrize(AR, side='right')
+    print('expanded AR', AR.shape)
+
+    C = padding(C, (D, D))
+    print('expanded C', C.shape)
+    print('norm of C', np.trace(C.T.conj()@C))
+
+    Hl, Hr = padding(Hl, (D, D)), padding(Hr, (D, D))
+
+    print('new left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+    print('new right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+    print('new norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+    return AL, AR, C, Hl, Hr
+
 energy, error = [], []
 
-count, tol, ep = 0, 1e-12, 1e-2
+count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
-d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 16
+D = 4
+Dmax = 16
 N = 500
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
@@ -440,7 +446,7 @@ sp, sm, n = 0.5*(sx + 1.0j*sy), 0.5*(sx - 1.0j*sy), 0.5*(sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
-t, V, V2  = 1, 0 ,0
+t, V, V2  = 1, 0, 0
 
 XYZ = -(x*np.kron(sx, sx) + y*np.kron(sy, sy) - z*np.kron(sz, sz)) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
@@ -468,8 +474,18 @@ AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
 AL, C = left_ortho(AR, C, tol/100)
 AR, C = right_ortho(AL, C, tol/100)
 
-while ep > tol and count < 1000:
+while (ep > tol or D != Dmax) and count < 1500:
     print(count)
+    print('AL', AL.shape)
+    print('AR', AR.shape)
+    print('C', C.shape)
+
+    if ep < tol:
+        D = 2 * D
+        print('new D', D)
+
+        AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr)
+
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL,AR,C,h,Hl,Hr,ep)
 
@@ -487,10 +503,13 @@ while ep > tol and count < 1000:
 
     energy.append(e)
     error.append(ep)
-    
+
+    print()
     count += 1
 
 print('discarded weight', calc_discard_weight(AL,AR,C,h,Hl,Hr))
+print('final AL', AL.shape)
+print('final AR', AR.shape)
 
 plt.plot(np.array(energy).real)
 plt.show()
