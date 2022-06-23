@@ -21,15 +21,15 @@ def left_ortho(A, X0, tol):
         evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
         return evals[0], evecs[:,0].reshape(D, D)
 
-    norm, l = left_fixed_point(A, A)
+    eval_LR, l = left_fixed_point(A, A)
 
-    l = 0.5*(l + l.T.conj())
-    l = l/np.trace(l)
+    l = l + l.T.conj()
+    l /= np.trace(l)
 
-    A = A/np.sqrt(norm)
+    A = A/np.sqrt(eval_LR)
 
     w, v = spla.eigh(l)
-    L = np.sqrt(np.diag(np.abs(w))) @ v.T.conj()
+    L = np.diag(np.sqrt(np.abs(w))) @ v.T.conj()
 
     Li = spla.inv(L)
 
@@ -145,11 +145,14 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     print('hl == hl+', spla.norm(hl - hl.T.conj()))
     print('hr == hr+', spla.norm(hr - hr.T.conj()))
 
+
     print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
     print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
 
+
     print('(L|hr)', np.trace(C.T.conj() @ C @ hr))
     print('(hl|R)', np.trace(hl @ C @ C.T.conj()))
+
 
     print('(L|Hr)', np.trace(C.T.conj() @ C @ Hr))
     print('(Hl|R)', np.trace(Hl @ C @ C.T.conj()))
@@ -235,10 +238,12 @@ def vumps(AL, AR, C, h, Hl, Hr, ep):
     H = spspla.LinearOperator((D * D, D * D), matvec=f)
     w, v = spspla.eigsh(H, k=1, which='SA', v0=C.ravel(), tol=ep/100)
     C = v[:,0].reshape(D, D)
+    print('C_eval', w[0], C.shape)
 
     H = spspla.LinearOperator((D * d * D, D * d * D), matvec=g)
     w, v = spspla.eigsh(H, k=1, which='SA', v0=AC.ravel(), tol=ep/100)
     AC = v[:,0].reshape(D, d, D)
+    print('AC_eval', w[0], AC.shape)
 
     epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
@@ -295,10 +300,7 @@ def calc_entent(C):
     return entent, b 
 
 def calc_fidelity(X, Y):
-    '''
-    Presumes that MPS tensors X and Y are both properly normalized
-
-    '''
+    '''Presumes that MPS tensors X and Y are both properly normalized'''
     E = np.tensordot(X,Y.conj(),axes=(0, 0)).transpose(0, 2, 1, 3).reshape(D * D, D * D)
 
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
@@ -481,7 +483,7 @@ AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 AL, C = left_ortho(AR, C, tol / 100)
 AR, C = right_ortho(AL, C, tol / 100)
 
-while (ep>tol or D!=Dmax) and count < 1500:
+while (ep > tol or D < Dmax) and count < 1500:
     print(count)
     print('AL', AL.shape)
     print('AR', AR.shape)
@@ -521,10 +523,10 @@ q, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
 plt.plot(np.array(energy).real)
-plt.show()
+plt.grid(); plt.show()
 
 plt.plot(np.array(error))
-plt.show()
+plt.yscale('log'); plt.grid(); plt.show()
 
 # np.savetxt('ss_D' + str(D) + '.dat', np.column_stack((q, stat_struc_fact)), fmt='%s %s')
 plt.plot(q, stat_struc_fact)
