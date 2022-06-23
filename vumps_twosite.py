@@ -105,6 +105,8 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
 
     hl -= el * np.eye(D)
     hr -= er * np.eye(D)
+    print('hl == hl+', spla.norm(hl - hl.T.conj()))
+    print('hr == hr+', spla.norm(hr - hr.T.conj()))
 
     hl = 0.5 * (hl + hl.T.conj())
     hr = 0.5 * (hr + hr.T.conj())
@@ -138,21 +140,14 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100, atol=ep/100)
 
     Hl, Hr = Hl.reshape(D, D), Hr.reshape(D, D)
+    print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
+    print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
 
     Hl = 0.5 * (Hl + Hl.T.conj())
     Hr = 0.5 * (Hr + Hr.T.conj())
 
-    print('hl == hl+', spla.norm(hl - hl.T.conj()))
-    print('hr == hr+', spla.norm(hr - hr.T.conj()))
-
-
-    print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
-    print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
-
-
     print('(L|hr)', np.trace(C.T.conj() @ C @ hr))
     print('(hl|R)', np.trace(hl @ C @ C.T.conj()))
-
 
     print('(L|Hr)', np.trace(C.T.conj() @ C @ Hr))
     print('(Hl|R)', np.trace(Hl @ C @ C.T.conj()))
@@ -162,9 +157,9 @@ def Apply_HC(AL, AR, h, Hl, Hr, X):
     X = X.reshape(D, D)
 
     t = AL.reshape(d * D, D) @ X @ AR.transpose(1, 0, 2).reshape(D, d * D)
-    t = h.reshape(d**2, d**2) @ t.reshape(d, D, d, D).transpose(0,2,1,3).reshape(d**2, D * D)
+    t = h.reshape(d**2, d**2) @ t.reshape(d, D, d, D).transpose(0, 2, 1, 3).reshape(d**2, D * D)
     t = t.reshape(d, d, D, D).transpose(0, 2, 1, 3).reshape(d * D, d * D)
-    H1 = AL.conj().transpose(2, 0, 1).reshape(D, d * D) @ t @ AR.conj().transpose(0,2,1).reshape(d * D, D)
+    H1 = AL.conj().transpose(2, 0, 1).reshape(D, d * D) @ t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
 
     H2 = Hl @ X
     H3 = X @ Hr
@@ -218,7 +213,7 @@ def calc_new_A(AL, AR, AC, C):
     return epl, epr, AL, AR
 
 def vumps(AL, AR, C, h, Hl, Hr, ep):
-    AC = np.tensordot(C, AR, axes=(1,1))
+    AC = np.tensordot(C, AR, axes=(1, 1))
 
     Hl, Hr, e = HeffTerms(AL, AR, C, h, Hl, Hr, ep)
 
@@ -440,7 +435,7 @@ energy, error = [], []
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 4
+D = 32
 Dmax = 16
 N = 500
 
@@ -449,21 +444,21 @@ sx = np.array([[0, 1],[1, 0]])
 sy = np.array([[0, -1j],[1j, 0]])
 sz = np.array([[1, 0],[0, -1]])
 
-sp = 0.5*(sx + 1.0j*sy)
-sm = 0.5*(sx - 1.0j*sy)
-n = 0.5*(sz + np.eye(d))
+sp = 0.5 * (sx + 1.0j*sy)
+sm = 0.5 * (sx - 1.0j*sy)
+n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
-t, V, V2  = 1, 0, 0
+t, V  = 0.5, 0
 
-XYZ = -(x*np.kron(sx, sx) + y*np.kron(sy, sy) - z*np.kron(sz, sz)) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
+XYZ = - 0.25 * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + z * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
-TFI = -np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
+TFI = - np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
 
-tVV2 = -t * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
+tV = - (t / 2) * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
 
-h = XYZ
+h = tV
 h = h.reshape(d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
