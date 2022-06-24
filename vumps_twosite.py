@@ -304,7 +304,7 @@ def calc_fidelity(X, Y):
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
   
-    q = np.linspace(0, np.pi, N)
+    q = nonuniform_mesh(npts_left=2*N, npts_mid=N, npts_right=N, k0=0.05, dk=0.05) * np.pi    # np.linspace(0,np.pi,N)
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -348,8 +348,8 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
-    for i in range(N):
-        p = q[i]
+    for p in q:
+        # p = q[i]
 
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
@@ -370,7 +370,7 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
 
-    q = np.linspace(0, np.pi, N)
+    q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi    # np.linspace(0,np.pi,N)
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -411,8 +411,8 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
-    for i in range(N):
-        p = q[i]
+    for p in q:
+        # p = q[i]
 
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
@@ -430,13 +430,26 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
         momentum.append(s.real)
     return q, np.array(momentum)
 
-energy, error = [], []
+def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
+    k_left, k_right = k0 - dk, k0 + dk
+    mesh = np.concatenate((
+            np.linspace(0.0,     k_left,  npts_left, endpoint=False),
+            np.linspace(k_left,  k_right, npts_mid,  endpoint=False),
+            np.linspace(k_right, 1.0,     npts_right)
+            ))
+    # print(mesh)
+
+    # momenta = mesh * np.pi
+    # print(momenta)
+    return mesh
+
+energy, error, discard_weight = [], [], []
 
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
 #D = 80 + int(sys.argv[1]) * 10
 D = 32
-Dmax = 16
+Dmax = 4
 N = 500
 
 si = np.array([[1, 0],[0, 1]])
@@ -448,15 +461,15 @@ sp = 0.5 * (sx + 1.0j*sy)
 sm = 0.5 * (sx - 1.0j*sy)
 n = 0.5 * (sz + np.eye(d))
 
-x, y, z = 1, 1, 0
+x, y, z = 1, 1, 0.5
 
-t, V  = 0.5, 0
+t, V = 1, 0.5
 
-XYZ = - 0.25 * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + z * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
+XYZ = - (1 / 4) * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + (z / 4) * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
-TFI = - np.kron(sx, sx) - (1/2) * (np.kron(sz, si) + np.kron(si, sz))
+TFI = - np.kron(sx, sx) - (1 / 2) * (np.kron(sz, si) + np.kron(si, sz))
 
-tV = - (t / 2) * (np.kron(sx, sx) + np.kron(sy, sy)) + V * np.kron(sz, sz)
+tV = - (t / 2) * (np.kron(sx, sx) + np.kron(sy, sy)) + (V / 4) * np.kron(sz, sz)
 
 h = tV
 h = h.reshape(d, d, d, d)
@@ -510,61 +523,64 @@ while (ep > tol or D < Dmax) and count < 1500:
     print()
     count += 1
 
-print('discarded weight', calc_discard_weight(AL, AR, C, h, Hl, Hr))
+x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
+discard_weight.append(x)
+print('discarded weight', x)
+
 print('final AL', AL.shape)
 print('final AR', AR.shape)
 
-q, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
-q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
+qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
+qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
-plt.plot(np.array(energy).real)
-plt.grid(); plt.show()
+# plt.plot(np.array(energy).real)
+# plt.grid(); plt.show()
 
-plt.plot(np.array(error))
-plt.yscale('log'); plt.grid(); plt.show()
+# plt.plot(np.array(error))
+# plt.yscale('log'); plt.grid(); plt.show()
 
-# np.savetxt('ss_D' + str(D) + '.dat', np.column_stack((q, stat_struc_fact)), fmt='%s %s')
-plt.plot(q, stat_struc_fact)
-plt.xticks(np.linspace(0, 1, 5) * np.pi)
-plt.grid(); plt.show()
+# np.savetxt('s_D' + str(D) + '.dat', np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+# plt.plot(qs, stat_struc_fact, 'x')
+# plt.xticks(np.linspace(0, 1, 5) * np.pi)
+# plt.grid(); plt.show()
 
-# np.savetxt('nn_D' + str(D) + '.dat', np.column_stack((q, momentum)), fmt='%s %s')
-plt.plot(q, momentum)
-plt.xticks(np.linspace(0, 1, 5) * np.pi)
-plt.grid(); plt.show()
+# np.savetxt('n_D' + str(D) + '.dat', np.column_stack((qm, momentum)), fmt='%s %s')
+# plt.plot(qm, momentum, 'x')
+# plt.xticks(np.linspace(0, 1, 5) * np.pi)
+# plt.grid(); plt.show()
 
-# model = 'tVV2'
+model = 'tV'
 
-# path = '/home/baktay.j/vumps/data'
+path = '/home/baktay.j/vumps/data'
 
-# filename = "energy_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), energy)
+filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+np.savetxt(os.path.join(path, filename), energy)
 
-# filename = "error_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), error)
+filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+np.savetxt(os.path.join(path, filename), error)
 
-# filename = "discweight_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), discard_weight)
+filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+np.savetxt(os.path.join(path, filename), discard_weight)
 
-# filename = "statstrucfact_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
-# np.savetxt(os.path.join(path, filename), stat_struc_fact)
+filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)))
 
-# filename = "momentum_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
-# np.savetxt(os.path.join(path, filename), momentum)
+filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)))
 
-# filename1 = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# filename2 = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# filename3 = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+filename1 = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+filename2 = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+filename3 = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 
-# open(os.path.join(path, filename1), 'a')
-# for data_slice in AL:
-#     np.savetxt(os.path.join(path, filename1), data_slice)
+open(os.path.join(path, filename1), 'a')
+for data_slice in AL:
+    np.savetxt(os.path.join(path, filename1), data_slice)
 
-# open(os.path.join(path, filename2), 'a')
-# for data_slice in AR:
-#     np.savetxt(os.path.join(path, filename2), data_slice)
+open(os.path.join(path, filename2), 'a')
+for data_slice in AR:
+    np.savetxt(os.path.join(path, filename2), data_slice)
 
-# np.savetxt(os.path.join(path, filename3), C)
+np.savetxt(os.path.join(path, filename3), C)
 
 
 
