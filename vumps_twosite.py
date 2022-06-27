@@ -331,17 +331,15 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     def left_env(X):
         X = X.reshape(D, D)
 
-        t = X @ AR.transpose(1,0,2).reshape(D,d*D)
-        XT = AL.conj().transpose(2,1,0).reshape(D,D*d) @ t.reshape(D*d,D)
+        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t.reshape(D * d, D)
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
         X = X.reshape(D, D)
 
-        tensors = [AL, AR.conj(), X]
-        indices = [(3, -1, 2), (3, -2, 1), (2, 1)]
-        contord = [2, 3, 1]
-        XT = nc.ncon(tensors, indices, contord)
+        t = AL.reshape(d * D, D) @ X
+        XT = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D) @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
