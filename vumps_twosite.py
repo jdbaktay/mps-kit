@@ -390,10 +390,10 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     def left_env(X):
         X = X.reshape(D, D)
 
-        tensors = [X, AR, o3, AL.conj()]
-        indices = [(1, 2), (3, 2, -2), (4,3) , (4, 1, -1)]
-        contord = [2, 3, 4, 1]
-        XT = nc.ncon(tensors, indices, contord)
+        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        t = o3 @ t.reshape(D, d, D).transpose(1, 0, 2).reshape(d, D * D)
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D * d, D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
@@ -444,7 +444,7 @@ energy, error, discard_weight = [], [], []
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 20
+D = 30
 Dmax = 4
 N = 500
 
