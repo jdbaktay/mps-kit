@@ -445,7 +445,7 @@ energy, error, discard_weight = [], [], []
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 45
+D = 16
 Dmax = 4
 N = 500
 
@@ -460,7 +460,7 @@ n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
-t, V = 1, 0
+t, V, V2 = 1, 0, 0
 
 XYZ = - (1 / 4) * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + (z / 4) * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
@@ -528,6 +528,7 @@ print('final AL', AL.shape)
 print('final AR', AR.shape)
 
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
+
 qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
 plt.plot(np.array(energy).real)
@@ -536,12 +537,12 @@ plt.grid(); plt.show()
 plt.plot(np.array(error))
 plt.yscale('log'); plt.grid(); plt.show()
 
-np.savetxt('s_D' + str(D) + '.dat', np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+# np.savetxt('s_D' + str(D) + '.dat', np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
 plt.plot(qs, stat_struc_fact, 'x')
 plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
-np.savetxt('n_D' + str(D) + '.dat', np.column_stack((qm, momentum)), fmt='%s %s')
+# np.savetxt('n_D' + str(D) + '.dat', np.column_stack((qm, momentum)), fmt='%s %s')
 plt.plot(qm, momentum, 'x')
 plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
@@ -565,19 +566,21 @@ plt.grid(); plt.show()
 # filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)))
 
-# filename1 = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# filename2 = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# filename3 = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# with open(os.path.join(path, filename), 'a') as outfile:
+#     for data_slice in AL:
+#         np.savetxt(outfile, data_slice)
 
-# open(os.path.join(path, filename1), 'a')
-# for data_slice in AL:
-#     np.savetxt(os.path.join(path, filename1), data_slice)
+# filename = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# with open(os.path.join(path, filename), 'a') as outfile:
+#     for data_slice in AR:
+#         np.savetxt(outfile, data_slice)
 
-# open(os.path.join(path, filename2), 'a')
-# for data_slice in AR:
-#     np.savetxt(os.path.join(path, filename2), data_slice)
+# filename = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), C)
 
-# np.savetxt(os.path.join(path, filename3), C)
+
+
 
 
 
