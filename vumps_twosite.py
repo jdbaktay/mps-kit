@@ -318,11 +318,11 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     print('s --> s1', s1)
 
     def left(X,o,Y):
-        indices =[(2,1,-2), (3,2), (3,1,-1)]
+        indices = [(2,1,-2), (3,2), (3,1,-1)]
         return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     def right(X,o,Y):
-        indices =[(2,-1,1), (3,2), (3,-2,1)]
+        indices = [(2,-1,1), (3,2), (3,-2,1)]
         return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
@@ -331,10 +331,8 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     def left_env(X):
         X = X.reshape(D, D)
 
-        tensors = [X, AR, AL.conj()]
-        indices = [(1, 2), (3, 2, -2), (3, 1, -1)]
-        contord = [2, 3, 1]
-        XT = nc.ncon(tensors, indices, contord)
+        t = X @ AR.transpose(1,0,2).reshape(D,d*D)
+        XT = AL.conj().transpose(2,1,0).reshape(D,D*d) @ t.reshape(D*d,D)
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
@@ -448,7 +446,7 @@ energy, error, discard_weight = [], [], []
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 64
+D = 20
 Dmax = 4
 N = 500
 
@@ -461,7 +459,7 @@ sp = 0.5 * (sx + 1.0j*sy)
 sm = 0.5 * (sx - 1.0j*sy)
 n = 0.5 * (sz + np.eye(d))
 
-x, y, z = 1, 1, 0.5
+x, y, z = 1, 1, 0
 
 t, V = 1, 0
 
