@@ -304,7 +304,7 @@ def calc_fidelity(X, Y):
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
   
-    q = nonuniform_mesh(npts_left=0, npts_mid=100, npts_right=20, k0=0.05, dk=0.05) * np.pi    # np.linspace(0,np.pi,N)
+    q = nonuniform_mesh(npts_left=0, npts_mid=100, npts_right=20, k0=0.05, dk=0.05) * np.pi
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -339,7 +339,8 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
         X = X.reshape(D, D)
 
         t = AL.reshape(d * D, D) @ X
-        XT = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D) @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
+        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
@@ -366,7 +367,7 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
 
-    q = nonuniform_mesh(npts_left=10, npts_mid=100, npts_right=10, k0=0.5, dk=0.1) * np.pi    # np.linspace(0,np.pi,N)
+    q = nonuniform_mesh(npts_left=10, npts_mid=100, npts_right=10, k0=0.5, dk=0.1) * np.pi
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -399,10 +400,10 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     def right_env(X):
         X = X.reshape(D,D)
 
-        tensors = [AL, o3, AR.conj(), X]
-        indices = [(3, -1, 2), (4,3), (4, -2, 1), (2, 1)]
-        contord = [2, 3, 4, 1]
-        XT = nc.ncon(tensors, indices, contord)
+        t = AL.reshape(d * D, D) @ X
+        t = o3 @ t.reshape(d, D * D)
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
+        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
@@ -444,7 +445,7 @@ energy, error, discard_weight = [], [], []
 count, tol, ep, d = 0, 1e-12, 1e-2, 2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 30
+D = 45
 Dmax = 4
 N = 500
 
