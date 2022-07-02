@@ -10,7 +10,7 @@ import functools
 import sys
 import os
 
-def left_ortho(A, X0, tol):
+def left_ortho(A, X0, tol, stol):
     def left_fixed_point(A, B):
         def left_transfer_op(X):
             tensors = [A, X.reshape(D, D), B.conj()]
@@ -32,13 +32,20 @@ def left_ortho(A, X0, tol):
     w, v = spla.eigh(l)
     L = np.diag(np.sqrt(np.abs(w))) @ v.T.conj()
 
-    Li = spla.inv(L)
+    u, s, vh = spla.svd(L)
+
+    si = 1/s
+    for i in range(s.size):
+        if s[i] < stol:
+            si[i] = 0
+
+    Li = vh.conj().T @ np.diag(1/s) @ u.conj().T
 
     AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
     return AL, L
 
-def right_ortho(A, X0, tol):
-    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol)
+def right_ortho(A, X0, tol, stol):
+    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol, stol)
     A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
     return A, L
 
@@ -203,7 +210,7 @@ def calc_new_A(AL, AR, AC, C):
     epl = spla.norm(Bl)
     epr = spla.norm(Br)
 
-    s = svdvals(C)
+    s = spla.svdvals(C)
     print('first svals', s[:5])
     print('last svals', s[-5:])
 
@@ -447,10 +454,12 @@ def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
 
 energy, error, discard_weight = [], [], []
 
-count, tol, ep, d = 0, 1e-12, 1e-2, 2
+count, d = 0, 2
+
+tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 16
+D = 64
 Dmax = 4
 N = 500
 
@@ -465,7 +474,7 @@ n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
-t, V, V2 = 1, 0, 0
+t, V, V2 = 1, 0.5, 0
 
 XYZ = - (1 / 4) * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + (z / 4) * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
@@ -480,8 +489,8 @@ A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5
 Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 
-AL, C = left_ortho(A, C, tol / 100)
-AR, C = right_ortho(AL, C, tol / 100)
+AL, C = left_ortho(A, C, tol / 100, stol)
+AR, C = right_ortho(AL, C, tol / 100, stol)
 
 print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
 print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
@@ -490,8 +499,8 @@ print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR]
 
 AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 
-AL, C = left_ortho(AR, C, tol / 100)
-AR, C = right_ortho(AL, C, tol / 100)
+AL, C = left_ortho(AR, C, tol / 100, stol)
+AR, C = right_ortho(AL, C, tol / 100, stol)
 
 while (ep > tol or D < Dmax) and count < 1500:
     print(count)
