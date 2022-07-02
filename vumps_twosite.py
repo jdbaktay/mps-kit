@@ -1,5 +1,6 @@
 #cd Desktop/all/research/code/dMPS-TDVP
 
+import multiprocessing
 import ncon as nc
 import numpy as np
 import scipy.linalg as spla
@@ -201,6 +202,10 @@ def calc_new_A(AL, AR, AC, C):
 
     epl = spla.norm(Bl)
     epr = spla.norm(Br)
+
+    s = svdvals(C)
+    print('first svals', s[:5])
+    print('last svals', s[-5:])
 
     ulAC, plAC = spla.polar(AC.reshape(D * d, D), side='right')
     urAC, prAC = spla.polar(AC.reshape(D, d * D), side='left')
@@ -494,11 +499,11 @@ while (ep > tol or D < Dmax) and count < 1500:
     print('AR', AR.shape)
     print('C', C.shape)
 
-    if ep < tol:
-        D = 2 * D
-        print('new D', D)
+    # if ep < tol:
+    #     D = 2 * D
+    #     print('new D', D)
 
-        AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr)
+    #     AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr)
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL, AR, C, h, Hl, Hr, ep)
 
