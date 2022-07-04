@@ -483,9 +483,9 @@ count, d = 0, 2
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 16
-Dmax = 32
-delta_D = 10
+D = 32
+Dmax = 4
+delta_D = 0
 N = 100
 
 si = np.array([[1, 0],[0, 1]])
@@ -499,7 +499,7 @@ n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
-t, V, V2 = 1, 2, 0
+t, V, V2 = 1, 1, 0
 
 XYZ = - (1 / 4) * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + (z / 4) * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
@@ -533,7 +533,7 @@ while (ep > tol or D < Dmax) and count < 1500:
     print('AR', AR.shape)
     print('C', C.shape)
 
-    if ep < tol:
+    if ep < tol and delta_D != 0:
         AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D)
 
         D = D + delta_D
@@ -557,11 +557,11 @@ while (ep > tol or D < Dmax) and count < 1500:
     ep = np.maximum(epl, epr)
 
     print('ep ', ep)
+    print()
 
     energy.append(e)
     error.append(ep)
 
-    print()
     count += 1
 
 x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
@@ -581,17 +581,19 @@ plt.grid(); plt.show()
 plt.plot(np.array(error))
 plt.yscale('log'); plt.grid(); plt.show()
 
-# np.savetxt('s_D' + str(D) + '.dat', np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+model = 'tV'
+
+filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
 plt.plot(qs, stat_struc_fact, 'x')
 plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
-# np.savetxt('n_D' + str(D) + '.dat', np.column_stack((qm, momentum)), fmt='%s %s')
+filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
 plt.plot(qm, momentum, 'x')
 plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
-
-# model = 'tV'
 
 # path = '/home/baktay.j/vumps/data'
 
