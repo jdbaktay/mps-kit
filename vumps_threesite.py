@@ -66,29 +66,42 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     def eff_ham(X):
         X = X.reshape(d, D, d, D)
 
-        tensors = [AL, X, h, AL.conj()]
-        indices = [(4,1,2), (5,2,-3,-4), (3,-1,4,5),(3,1,-2)]
-        contord = [1,2,3,4,5]
+        tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
+        indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
+        contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         H1 = nc.ncon(tensors,indices,contord)
 
-        tensors = [X, h]
-        indices = [(1,-2,2,-4), (-1,-3,1,2)]
-        contord = [1,2]
+        # t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
+        # t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
+        # t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
+        # t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
+        # t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
+        # t = t.reshape(D,d,d,D).transpose(1,0,2,3)
+        # print(spla.norm(t - H1))
+
+        tensors = [AL, X, h, AL.conj()]
+        indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
+        contord = [1, 2, 3, 4, 5, 6] 
         H2 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, AR, h, AR.conj()]
-        indices = [(-1,-2,4,2), (5,2,1), (-3,3,4,5), (3,-4,1)]
-        contord = [1,2,3,4,5]
+        indices = [(4, -2, 5, 2), (6, 2, 1), (-1, -3, 3, 4, 5, 6), (3, -4, 1)]
+        contord = [1, 2, 3, 4, 5, 6]
         H3 = nc.ncon(tensors,indices,contord)
 
+        tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
+        indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
+        contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        H4 = nc.ncon(tensors,indices,contord)
+
         tensors = [Hl, X]
-        indices = [(-2,1), (-1,1,-3,-4)]
-        H4 = nc.ncon(tensors,indices)
+        indices = [(-2, 1), (-1, 1, -3, -4)]
+        H5 = nc.ncon(tensors,indices)
 
         tensors = [X, Hr]
-        indices = [(-1,-2,-3,1), (1,-4)]
-        H5 = nc.ncon(tensors,indices)
-        return H1 + H2 + H3 + H4 + H5
+        indices = [(-1, -2, -3, 1), (1, -4)]
+        H6 = nc.ncon(tensors,indices)
+        return (H1 + H2 + H3 + H4 + H5 + H6).ravel()
 
     A_two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
     A_two_site = eff_ham(A_two_site).reshape(d * D, d * D)
@@ -293,11 +306,11 @@ def vumps(AL, AR, C, h, Hl, Hr, ep):
 
 def calc_discard_weight(AL, AR, C, h, Hl, Hr):
     def eff_ham(X):
-        X = X.reshape(d,D,d,D)
+        X = X.reshape(d, D, d, D)
 
         tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
-        indices = [(7,1,2), (8,2,4), (9,4,-3,-4), (5,6,-1,7,8,9), (5,1,3), (6,3,-2)]
-        contord = [1,2,3,4,5,6,7,8,9]
+        indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
+        contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         H1 = nc.ncon(tensors,indices,contord)
 
         # t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
@@ -309,28 +322,28 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
         # print(spla.norm(t - H1))
 
         tensors = [AL, X, h, AL.conj()]
-        indices = [(4,1,2), (5,2,6,-4), (3,-1,-3,4,5,6), (3,1,-2)]
-        contord = [1,2,3,4,5,6]
+        indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
+        contord = [1, 2, 3, 4, 5, 6] 
         H2 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, AR, h, AR.conj()]
-        indices = [(4,-2,5,2), (6,2,1), (-1,-3,3,4,5,6), (3,-4,1)]
-        contord = [1,2,3,4,5,6]
+        indices = [(4, -2, 5, 2), (6, 2, 1), (-1, -3, 3, 4, 5, 6), (3, -4, 1)]
+        contord = [1, 2, 3, 4, 5, 6]
         H3 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
-        indices = [(-1,-2,7,4), (8,4,2), (9,2,1), (-3,5,6,7,8,9), (5,-4,3), (6,3,1)]
-        contord = [1,2,3,4,5,6,7,8,9]
+        indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
+        contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         H4 = nc.ncon(tensors,indices,contord)
 
         tensors = [Hl, X]
-        indices = [(-2,1),(-1,1,-3,-4)]
+        indices = [(-2, 1), (-1, 1, -3, -4)]
         H5 = nc.ncon(tensors,indices)
 
         tensors = [X, Hr]
-        indices = [(-1,-2,-3,1),(1,-4)]
+        indices = [(-1, -2, -3, 1), (1, -4)]
         H6 = nc.ncon(tensors,indices)
-        return (H1+H2+H3+H4+H5).ravel()
+        return (H1 + H2 + H3 + H4 + H5 + H6).ravel()
 
     two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
 
@@ -510,9 +523,9 @@ count, d = 0, 2
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 32
-Dmax = 4
-delta_D = 0
+D = 10
+Dmax = 30
+delta_D = 5 #delta_D must be smaller than D
 N = 100
 
 si = np.array([[1, 0],[0, 1]])
@@ -524,14 +537,17 @@ sp = 0.5 * (sx + 1.0j*sy)
 sm = 0.5 * (sx - 1.0j*sy)
 n = 0.5 * (sz + np.eye(d))
 
-x, y, z = 1, 1, 0
-XYZ = x * np.kron(np.kron(sx, sx), si) + y * np.kron(np.kron(sy, sy), si) + z * np.kron(np.kron(sz, sz), si)
-
 J, g = 1, 1
 TFI = -(J* np.kron(si, np.kron(sx, sx)) + g * np.kron(si, np.kron(sz, si)))
 
-t, V, V2 = 2, 0, 0
-tVV2 = -t * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) + V * np.kron(np.kron(sz, sz), si) + V2 * np.kron(np.kron(sz, si), sz)
+x, y, z = 1, 1, 0
+XYZ = (x / 4) * np.kron(np.kron(sx, sx), si) + (y / 4) * np.kron(np.kron(sy, sy), si) 
++ (z / 4) * np.kron(np.kron(sz, sz), si)
+
+t, V, V2 = 1, 2, 0
+tVV2 = - (t / 2) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) 
++ (V / 4) * np.kron(np.kron(sz, sz), si) 
++ (V2 / 4) * np.kron(np.kron(sz, si), sz)
 
 h = tVV2
 h = h.reshape(d, d, d, d, d, d)
@@ -621,35 +637,35 @@ plt.plot(qm, momentum, 'x')
 plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
-# model = 'tVV2'
-
 # path = '/home/baktay.j/vumps/data'
 
-# filename = "energy_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), energy)
 
-# filename = "error_%s_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), error)
 
-# filename = "statstrucfact_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
-# np.savetxt(os.path.join(path, filename), stat_struc_fact)
+# filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), discard_weight)
 
-# filename = "momentum_%s_%.2f_%.2f_%i_.txt" % (model , V, V2, D)
-# np.savetxt(os.path.join(path, filename), mom)
+# filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)))
 
-# filename1 = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# filename2 = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# filename3 = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)))
 
-# open(os.path.join(path, filename1), 'a')
-# for data_slice in AL:
-#     np.savetxt(os.path.join(path, filename1), data_slice)
+# filename = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# with open(os.path.join(path, filename), 'a') as outfile:
+#     for data_slice in AL:
+#         np.savetxt(outfile, data_slice)
 
-# open(os.path.join(path, filename2), 'a')
-# for data_slice in AR:
-#     np.savetxt(os.path.join(path, filename2), data_slice)
+# filename = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# with open(os.path.join(path, filename), 'a') as outfile:
+#     for data_slice in AR:
+#         np.savetxt(outfile, data_slice)
 
-# np.savetxt(os.path.join(path, filename3), C)
+# filename = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), C)
 
 
 
