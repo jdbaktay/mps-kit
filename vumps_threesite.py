@@ -1,13 +1,13 @@
 #cd Desktop/code/vumps 
 
+import ncon as nc
 import numpy as np
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
 import matplotlib.pyplot as plt
 import functools
-
-from numpy import tensordot as td
-from ncon import ncon as nc 
+import sys
+import os
 
 def calc_discard_weight(AL,AR,C,h,Hl,Hr):
 
@@ -72,7 +72,7 @@ def left_ortho(A, X0, tol, stol):
             tensors = [A, X.reshape(D, D), B.conj()]
             indices = [(1,2,-2), (3, 2), (1, 3, -1)]
             contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
+            return nc.ncon(tensors,indices,contord).ravel()
 
         E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
         evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
@@ -97,7 +97,7 @@ def left_ortho(A, X0, tol, stol):
 
     Li = vh.conj().T @ np.diag(1/s) @ u.conj().T
 
-    AL = nc([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
+    AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
     return AL, L
 
 def right_ortho(A, X0, tol, stol):
@@ -109,13 +109,13 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     tensors = [AL, AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
     indices = [(4,7,8), (5,8,10), (6,10,-2), (1,2,3,4,5,6), (1,7,9), (2,9,11), (3,11,-1)]
     contord = [7,8,9,10,11,1,2,3,4,5,6]
-    hl = nc(tensors,indices,contord)
+    hl = nc.ncon(tensors,indices,contord)
     el = np.trace(hl @ C @ C.T.conj())
 
     tensors = [AR, AR, AR, h, AR.conj(), AR.conj(), AR.conj()]
     indices = [(4,-1,10), (5,10,8), (6,8,7), (1,2,3,4,5,6), (1,-2,11), (2,11,9), (3,9,7)]
     contord = [7,8,9,10,11,1,2,3,4,5,6]
-    hr = nc(tensors,indices,contord)
+    hr = nc.ncon(tensors,indices,contord)
     er = np.trace(C.T.conj() @ C @ hr)
 
     e = 0.5 * (el + er)
@@ -254,12 +254,12 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     tensors = [AL, AL, h, AL.conj(), AL.conj()]
     indices = [(4, 7, 8), (5, 8, -3), (1, 2, -2, 4, 5, -4), (1, 7, 9), (2, 9, -1)]
     contord = [7, 8, 9, 1, 2, 4, 5]
-    hl_mid = nc(tensors,indices,contord)
+    hl_mid = nc.ncon(tensors,indices,contord)
 
     tensors = [AR, AR, h, AR.conj(), AR.conj()]
     indices = [(5, -3, 8), (6, 8, 7), (-1, 2, 3, -4, 5, 6), (2, -2, 9), (3, 9,7 )]
     contord = [7, 8, 9, 2, 3, 5, 6]
-    hr_mid = nc(tensors,indices,contord)
+    hr_mid = nc.ncon(tensors,indices,contord)
 
     f = functools.partial(Apply_HC, hl_mid, hr_mid, AL, AR, h, Hl, Hr)
     g = functools.partial(Apply_HAC, hl_mid, hr_mid, AL, AR, h, Hl, Hr)
@@ -277,214 +277,144 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
     epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
 
-def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
-  
-    N = 500
-    q = np.linspace(0,np.pi,N)
-
+def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
-    AC = td(AL, C, axes=(2,0))
+  
+    q = nonuniform_mesh(npts_left=0, npts_mid=N, npts_right=20, k0=0.05, dk=0.05) * np.pi
 
-    o1 = o1 - nc([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o2 = o2 - nc([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    AC = np.tensordot(AL, C, axes=(2,0))
+
+    o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
 
     tensors = [AC, o1, o2, AC.conj()]
     indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
-    s1 = nc(tensors, indices, contord)
+    s1 = nc.ncon(tensors, indices, contord)
+    print('s --> s1', s1)
 
     def left(X,o,Y):
-        indices =[(2,1,-2), (3,2), (3,1,-1)]
-        return nc([X, o, Y.conj()], indices, [1,2,3])
+        indices = [(2,1,-2), (3,2), (3,1,-1)]
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     def right(X,o,Y):
-        indices =[(2,-1,1), (3,2), (3,-2,1)]
-        return nc([X, o, Y.conj()], indices, [1,2,3])
+        indices = [(2,-1,1), (3,2), (3,-2,1)]
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
-    s2l, s2r = left(AC,o1,AL), right(AR,o2,AC)
-    s3l, s3r = left(AL,o2,AC), right(AC,o1,AR)
-
-    def left_fixed_point(A,B):
-        def left_transfer_op(X):
-
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
-
-    def right_fixed_point(A,B):
-        def right_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
-
-    l_Erl, r_Erl = left_fixed_point(AR,AL), right_fixed_point(AR,AL)
-
-    l_Erl, r_Erl = l_Erl/np.sqrt(np.trace(l_Erl@r_Erl)), r_Erl/np.sqrt(np.trace(l_Erl@r_Erl))
-
-    l_Elr, r_Elr = left_fixed_point(AL,AR), right_fixed_point(AL,AR)
-
-    l_Elr, r_Elr = l_Elr/np.sqrt(np.trace(l_Elr@r_Elr)), r_Elr/np.sqrt(np.trace(l_Elr@r_Elr))
+    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
+    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
 
     def left_env(X):
-        X = X.reshape(D,D)
+        X = X.reshape(D, D)
 
-        tensors = [X, AR, AL.conj()]
-        indices = [(1, 2), (3, 2, -2), (3, 1, -1)]
-        contord = [2, 3, 1]
-
-        XT = nc(tensors, indices, contord)
-        XR = np.trace(X @ r_Erl)*l_Erl
-        return (X - np.exp(-1.0j*p)*(XT-XR)).ravel()
+        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t.reshape(D * d, D)
+        return (X - np.exp(-1.0j * p) * XT).ravel()
 
     def right_env(X):
         X = X.reshape(D, D)
 
-        tensors = [AL, AR.conj(), X]
-        indices = [(3, -1, 2), (3, -2, 1), (2, 1)]
-        contord = [2, 3, 1]
+        t = AL.reshape(d * D, D) @ X
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
+        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+        return (X - np.exp(+1.0j * p) * XT).ravel()
 
-        XT = nc(tensors, indices, contord)
-        XL = np.trace(l_Elr @ X) * r_Elr
-        return (X - np.exp(+1.0j*p)*(XT-XL)).ravel()
+    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
-    for i in range(N):
-        p = q[i]
+    for p in q:
+        # p = q[i]
 
-        left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
-        right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
+        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
+        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), tol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), tol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
-        s2 = np.exp(-1.0j*p) * td(L1, s2r, axes=([1,0], [0,1]))
-        s3 = np.exp(+1.0j*p) * td(s3l, R1, axes=([1,0], [0,1]))
+        s2 = np.exp(-1.0j*p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
+        s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
 
-        s = s1+s2+s3
+        s = s1 + s2 + s3
 
         stat_struc_fact.append(s.real)
-
     return q, np.array(stat_struc_fact)
 
-def calc_momentum(AL,AR,C,o1,o2,o3):
-  
-    N = 500
-    q = np.linspace(0,np.pi,N)
-
+def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
-    AC = td(AL, C, axes=(2,0))
 
-    o1 = o1 - nc([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o2 = o2 - nc([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o3 = o3 - nc([AC, o3, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
+
+    AC = np.tensordot(AL, C, axes=(2,0))
 
     tensors = [AC, o1, o2, AC.conj()]
     indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
-    s1 = nc(tensors, indices, contord)
+    s1 = nc.ncon(tensors, indices, contord)
+    print('n --> s1', s1)
 
     def left(X,o,Y):
         indices =[(2,1,-2), (3,2), (3,1,-1)]
-        return nc([X, o, Y.conj()], indices, [1,2,3])
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     def right(X,o,Y):
         indices =[(2,-1,1), (3,2), (3,-2,1)]
-        return nc([X, o, Y.conj()], indices, [1,2,3])
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
-    s2l, s2r = left(AC,o1,AL), right(AR,o2,AC)
-    s3l, s3r = left(AL,o2,AC), right(AC,o1,AR)
-
-    def left_fixed_point(A,B):
-        def left_transfer_op(X):
-
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
-
-    def right_fixed_point(A,B):
-        def right_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
-        evals, evecs = spspla.eigs(E,k=1,which="LR", tol=10**-12)
-        return evecs[:,0].reshape(D,D)
-
-    l_Erl, r_Erl = left_fixed_point(AR,AL), right_fixed_point(AR,AL)
-
-    l_Erl, r_Erl = l_Erl/np.sqrt(np.trace(l_Erl@r_Erl)), r_Erl/np.sqrt(np.trace(l_Erl@r_Erl))
-
-    l_Elr, r_Elr = left_fixed_point(AL,AR), right_fixed_point(AL,AR)
-
-    l_Elr, r_Elr = l_Elr/np.sqrt(np.trace(l_Elr@r_Elr)), r_Elr/np.sqrt(np.trace(l_Elr@r_Elr))
-
-    # print(np.trace(l_Erl@r_Erl))
-    # print(spla.norm(np.subtract(l_Erl, nc([l_Erl, AR, AL.conj()], [[2,1], [3,1,-2], [3,2,-1]]))))
-    # print(spla.norm(np.subtract(r_Erl, nc([r_Erl, AR, AL.conj()], [[1,2], [3,-1,1], [3,-2,2]]))))
-
-    # print('norm', np.trace(l_Elr@r_Elr))
-    # print(spla.norm(np.subtract(l_Elr, nc([l_Elr, AL, AR.conj()], [[2,1], [3,1,-2], [3,2,-1]]))))
-    # print(spla.norm(np.subtract(r_Elr, nc([r_Elr, AL, AR.conj()], [[1,2], [3,-1,1], [3,-2,2]]))))
+    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
+    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
 
     def left_env(X):
-        X = X.reshape(D,D)
-
-        tensors = [X, AR, o3, AL.conj()]
-        indices = [(1, 2), (3, 2, -2), (4,3) , (4, 1, -1)]
-        contord = [2, 3, 4, 1]
-
-        XT = nc(tensors, indices, contord)
-        XR = np.trace(X @ r_Erl)*l_Erl
-        return (X - np.exp(-1.0j*p)*(XT-XR)).ravel()
-
-    def right_env(X):
         X = X.reshape(D, D)
 
-        tensors = [AL, o3, AR.conj(), X]
-        indices = [(3, -1, 2), (4,3), (4, -2, 1), (2, 1)]
-        contord = [2, 3, 4, 1]
+        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        t = o3 @ t.reshape(D, d, D).transpose(1, 0, 2).reshape(d, D * D)
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D * d, D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t
+        return (X - np.exp(-1.0j * p) * XT).ravel()
 
-        XT = nc(tensors, indices, contord)
-        XL = np.trace(l_Elr @ X) * r_Elr
-        return (X - np.exp(+1.0j*p)*(XT-XL)).ravel()
+    def right_env(X):
+        X = X.reshape(D,D)
 
-    for i in range(N):
-        p = q[i]; print(i)
+        t = AL.reshape(d * D, D) @ X
+        t = o3 @ t.reshape(d, D * D)
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
+        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+        return (X - np.exp(+1.0j * p) * XT).ravel()
 
-        left_env_op = spspla.LinearOperator((D*D, D*D), matvec=left_env)
-        right_env_op = spspla.LinearOperator((D*D, D*D), matvec=right_env)
+    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), tol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), tol=10**-12)
+    for p in q:
+        # p = q[i]
+
+        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
+        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
+
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
-        s2 = np.exp(-1.0j*p) * td(L1, s2r, axes=([1,0], [0,1]))
-        s3 = np.exp(+1.0j*p) * td(s3l, R1, axes=([1,0], [0,1]))
+        s2 = np.exp(-1.0j*p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
+        s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
 
-        s = s1+s2+s3
-        
+        s = s1 + s2 + s3
+
         momentum.append(s.real)
-
     return q, np.array(momentum)
+
+def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
+    k_left, k_right = k0 - dk, k0 + dk
+    mesh = np.concatenate((
+            np.linspace(0.0,     k_left,  npts_left, endpoint=False),
+            np.linspace(k_left,  k_right, npts_mid,  endpoint=False),
+            np.linspace(k_right, 1.0,     npts_right)
+            ))
+    # print(mesh)
+
+    # momenta = mesh * np.pi
+    # print(momenta)
+    return mesh
 
 def calc_entent(C):
     u, s, vh = spla.svd(C)
@@ -516,6 +446,7 @@ d = 2
 D = 32
 deltaD = 2
 count = 0
+N = 100
 
 si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
 sy, sz = np.array([[0, -1j],[1j, 0]]), np.array([[1, 0],[0, -1]])
@@ -556,10 +487,10 @@ Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 AL, C = left_ortho(A, C, tol/100, stol)
 AR, C = right_ortho(AL, C, tol/100, stol)
 
-print('left iso', spla.norm(nc([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-print('right iso', spla.norm(nc([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-print('norm', nc([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-print('ALC - CAR', spla.norm(nc([AL,C],[[-1,-2,1],[1,-3]]) - nc([C,AR],[[-2,1], [-1,1,-3]])))
+print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
 
 AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
 
@@ -572,10 +503,10 @@ while ep > tol and count < 400:
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL,AR,C,h,Hl,Hr,ep)
 
-    print('left iso', spla.norm(nc([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-    print('right iso', spla.norm(nc([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-    print('norm', nc([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-    print('ALC - CAR', spla.norm(nc([AL,C],[[-1,-2,1],[1,-3]]) - nc([C,AR],[[-2,1], [-1,1,-3]])))
+    print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+    print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+    print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+    print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
     print('energy', e)
     print('epl', epl)
     print('epr', epr)
@@ -592,9 +523,9 @@ while ep > tol and count < 400:
 
 # x = calc_discard_weight(AL,AR,C,h,Hl,Hr)
 
-q, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None)
+qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz)
+qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
 energy = np.array(energy)
 plt.plot(energy.real)
@@ -606,10 +537,10 @@ plt.plot(error)
 plt.title('Energy: ' + 'D = ' + str(D) + ', d = ' + str(d) + ', z = ' + str(z))
 plt.show()
 
-plt.plot(q, stat_struc_fact)
+plt.plot(qs, stat_struc_fact)
 plt.show()
 
-plt.plot(q, momentum)
+plt.plot(qm, momentum)
 plt.show()
 
 # model = 'tVV2'
