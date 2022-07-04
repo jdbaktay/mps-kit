@@ -184,22 +184,6 @@ def Apply_HC(hl_mid,hr_mid,AL,AR,h,Hl,Hr,X):
 
     H3 = Hl @ X
     H4 = X @ Hr
-
-    # X = X.reshape(D, D)
-
-    # t = hl_mid.transpose(0,1,3,2).reshape(D*d*d,D)@X
-    # t = t.reshape(D*d,d*D)@AR.reshape(d*D,D)
-    # t = t.reshape(D,d*D)@AR.conj().transpose(0,2,1).reshape(d*D,D)
-    # H1 = t
-
-    # t = X@hr_mid.transpose(2,0,1,3).reshape(D,d*D*d)
-    # t = AL.transpose(1,0,2).reshape(D,d*D)@t.reshape(D,d,D,d).transpose(3,0,1,2).reshape(d*D,d*D)
-    # t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,D)
-    # H2 = t
-
-    # H3 = Hl @ X
-    # H4 = X @ Hr
-
     return (H1 + H2 + H3 + H4).ravel()
 
 def Apply_HAC(hl_mid, hr_mid, AL, AR, h, Hl, Hr ,X):
@@ -225,32 +209,6 @@ def Apply_HAC(hl_mid, hr_mid, AL, AR, h, Hl, Hr ,X):
 
     t = X.reshape(D * d, D) @ Hr
     H5 = t.reshape(D, d, D)
-
-    # X = X.reshape(D, d, D)
-
-    # t = hl_mid.reshape(D*d,D*d)@X.reshape(D*d,D)
-    # t = t.reshape(D,d,D)
-    # H1 = t
-
-    # t = AL.reshape(d*D,D)@X.reshape(D,d*D)
-    # t = t.reshape(d*D*d,D)@AR.transpose(1,0,2).reshape(D,d*D)
-    # t = t.reshape(d,D,d,d,D).transpose(1,4,0,2,3).reshape(D*D,d*d*d)@h.reshape(d*d*d,d*d*d).transpose(1,0)
-    # t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D,D,d,d,d).transpose(0,2,3,1,4).reshape(D*d,d*D*d)
-    # t = t.reshape(D*d,D*d)@AR.conj().transpose(2,0,1).reshape(D*d,D)
-    # t = t.reshape(D,d,D)
-    # H2 = t
-
-    # t = X.reshape(D,d*D)@hr_mid.transpose(3,2,0,1).reshape(d*D,d*D)
-    # t = t.reshape(D,d,D)
-    # H3 = t
-
-    # t = Hl@X.reshape(D,d*D)
-    # t = t.reshape(D,d,D)
-    # H4 = t
-
-    # t = X.reshape(D*d,D)@Hr
-    # t = t.reshape(D,d,D)
-    # H5 = t
     return (H1 + H2 + H3 + H4 + H5).ravel()
 
 def calc_new_A(AL,AR,AC,C):
@@ -554,7 +512,7 @@ tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 15
+D = 25
 deltaD = 2
 count = 0
 
