@@ -26,7 +26,7 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
         t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
         t = t.reshape(D,d,d,D).transpose(1,0,2,3)
 
-        print(spla.norm(t - H1))
+        # print(spla.norm(t - H1))
 
         tensors = [AL, X, h, AL.conj()]
         indices = [(4,1,2), (5,2,6,-4), (3,-1,-3,4,5,6), (3,1,-2)]
@@ -66,79 +66,44 @@ def calc_discard_weight(AL,AR,C,h,Hl,Hr):
         
     return t
 
-def left_ortho(A,X0,D,tol):
-
-    def left_fixed_point(A,B):
+def left_ortho(A, X0, tol, stol):
+    def left_fixed_point(A, B):
         def left_transfer_op(X):
+            tensors = [A, X.reshape(D, D), B.conj()]
+            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
+            contord = [2, 3, 1]
+            return nc.ncon(tensors,indices,contord).ravel()
 
-            t = X.reshape(D,D)@A.transpose(1,0,2).reshape(D,d*D)
-            t = B.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,D)
-            t = t.ravel()
-
-            # tensors = [A, X.reshape(D, D), B.conj()]
-            # indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            # contord = [2, 3, 1]
-            # nc(tensors,indices,contord).ravel()
-
-            return t
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=left_transfer_op)
-
+        E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
         evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
+        return evals[0], evecs[:,0].reshape(D, D)
 
-        return evals[0], evecs[:,0].reshape(D,D)
+    eval_LR, l = left_fixed_point(A, A)
 
-    norm, l = left_fixed_point(A,A)
+    l = l + l.T.conj()
+    l /= np.trace(l)
 
-    A = A/np.sqrt(norm)
-
-    l = 0.5*(l + l.T.conj())
-
-    l = l/np.trace(l)
+    A = A/np.sqrt(eval_LR)
 
     w, v = spla.eigh(l)
-    l = v@np.diag(np.abs(w))@v.T.conj()
+    L = np.diag(np.sqrt(np.abs(w))) @ v.T.conj()
 
-    L = spla.cholesky(l, lower=False)
+    u, s, vh = spla.svd(L)
 
-    Li = spla.inv(L)
+    si = 1/s
+    for i in range(s.size):
+        if s[i] < stol:
+            si[i] = 0
 
-    AL = nc([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
+    Li = vh.conj().T @ np.diag(1/s) @ u.conj().T
 
+    AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
     return AL, L
 
-def right_ortho(A,X0,D,tol):
-
-    def right_fixed_point(A,B):
-        def right_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1, -1, 2), (2, 3), (1, -2, 3)]
-            contord = [2, 3, 1]
-            return nc(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D*D,D*D), matvec=right_transfer_op)
-
-        evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
-
-        return evals[0], evecs[:,0].reshape(D,D)
-
-    norm, r = right_fixed_point(A,A)
-
-    A = A/np.sqrt(norm)
-
-    r = 0.5*(r + r.T.conj())
-
-    r = r/np.trace(r)
-
-    w, v = spla.eigh(r)
-    r = v@np.diag(np.abs(w))@v.T.conj()
-
-    R = spla.cholesky(r, lower=True)
-    Ri = spla.inv(R)
-
-    AR = nc([Ri, A, R], [(-2,1), (-1,1,2), (2,-3)])
-
-    return AR, R
+def right_ortho(A, X0, tol, stol):
+    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol, stol)
+    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
+    return A, L
 
 def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
 
