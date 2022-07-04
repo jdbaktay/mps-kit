@@ -91,12 +91,10 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
         H5 = nc.ncon(tensors,indices)
         return H1 + H2 + H3 + H4 + H5
 
-    A_two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
-
+    A_two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
     A_two_site = eff_ham(A_two_site).reshape(d * D, d * D)
 
     t = Nl.conj().T @ A_two_site @ Nr.conj().T
-
     u, s, vh = spla.svd(t, full_matrices=True)
 
     u = u[:,:delta_D]
@@ -117,7 +115,6 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
         AR.append(np.pad(AR_new[i,:,:], pad_width=((0, 0), (0, delta_D)), mode='constant'))
 
     C = np.pad(C, pad_width=((0, delta_D), (0, delta_D)), mode='constant')
-
     Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
     Hr = np.pad(Hr, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
 
