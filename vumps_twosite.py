@@ -49,52 +49,79 @@ def right_ortho(A, X0, tol, stol):
     A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
     return A, L
 
-def padding(A, dims):
-    '''
-    dims is a tuple with the new dimensions of the tensor A.
-    use to expand NOT shrink the dimension of AL, AR, C, HL, HR
+def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
+    Al = AL.reshape(d * D, D)
+    Ar = AR.transpose(1, 0, 2).reshape(D, d * D)
 
-    '''
-    if A.shape != dims:
-        for k in range(len(dims)):
-            if A.shape[k] != dims[k]:
-                ind_exp = list(range(-1, -len(dims) - 1, -1))
-                ind_exp[k] = 1
-                tensors = [A, np.eye(A.shape[k], dims[k])]
-                indices = [ind_exp, (1, -k - 1)]
-                A = nc.ncon(tensors, indices)
-    return A
+    def calcnullspace(n):
+        u, s, vh = spla.svd(n, full_matrices=True)
 
-def isometrize(A, side=str):
-    if side == 'left':
-        A = A.reshape(d * D, D)
-        u, s, vh = spla.svd(A, full_matrices=False)
-        A = (u @ vh).reshape(d, D, D)
-    
-    if side == 'right':
-        A = A.transpose(1, 0, 2).reshape(D, d * D)
-        u, s, vh = spla.svd(A, full_matrices=False)
-        A = (u @ vh).reshape(D, d, D).transpose(1, 0, 2)
-    return A
+        right_null = vh.conj().T[:,D:]
+        left_null = u.conj().T[D:,:]
 
-def dynamic_expansion(AL, AR, C, Hl, Hr):
-    AL = padding(AL, (d, D, D))
-    AL = isometrize(AL, side='left')
-    print('expanded AL', AL.shape)
+        return left_null, right_null
 
-    AR = padding(AR, (d, D, D))
-    AR = isometrize(AR, side='right')
-    print('expanded AR', AR.shape)
+    _, Nl = calcnullspace(Al.T.conj())
+    Nr, _  = calcnullspace(Ar.T.conj())
 
-    C = padding(C, (D, D))
-    print('expanded C', C.shape)
+    def eff_ham(X):
+        X = X.reshape(d, D, d, D)
 
-    Hl, Hr = padding(Hl, (D, D)), padding(Hr, (D, D))
+        tensors = [AL, X, h, AL.conj()]
+        indices = [(4,1,2), (5,2,-3,-4), (3,-1,4,5),(3,1,-2)]
+        contord = [1,2,3,4,5]
+        H1 = nc.ncon(tensors,indices,contord)
 
-    print('new left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-    print('new right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-    print('new norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-    return AL, AR, C, Hl, Hr
+        tensors = [X, h]
+        indices = [(1,-2,2,-4), (-1,-3,1,2)]
+        contord = [1,2]
+        H2 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, AR, h, AR.conj()]
+        indices = [(-1,-2,4,2), (5,2,1), (-3,3,4,5), (3,-4,1)]
+        contord = [1,2,3,4,5]
+        H3 = nc.ncon(tensors,indices,contord)
+
+        tensors = [Hl, X]
+        indices = [(-2,1), (-1,1,-3,-4)]
+        H4 = nc.ncon(tensors,indices)
+
+        tensors = [X, Hr]
+        indices = [(-1,-2,-3,1), (1,-4)]
+        H5 = nc.ncon(tensors,indices)
+        return H1 + H2 + H3 + H4 + H5
+
+    A_two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
+
+    A_two_site = eff_ham(A_two_site).reshape(d * D, d * D)
+
+    t = Nl.conj().T @ A_two_site @ Nr.conj().T
+
+    u, s, vh = spla.svd(t, full_matrices=True)
+
+    u = u[:,:delta_D]
+    vh = vh[:delta_D,:]
+
+    expand_left = (Nl @ u).reshape(d, D, delta_D)
+    expand_right = (vh @ Nr).reshape(delta_D, d, D).transpose(1, 0, 2)
+
+    AL_new = np.concatenate((AL, expand_left), axis=2)
+    AR_new = np.concatenate((AR, expand_right), axis=1)
+
+    AL = []
+    for i in range(AL_new.shape[0]):
+        AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, 0)), mode='constant'))
+
+    AR = []
+    for i in range(AR_new.shape[0]):
+        AR.append(np.pad(AR_new[i,:,:], pad_width=((0, 0), (0, delta_D)), mode='constant'))
+
+    C = np.pad(C, pad_width=((0, delta_D), (0, delta_D)), mode='constant')
+
+    Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
+    Hr = np.pad(Hr, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
+
+    return np.array(AL), np.array(AR), C, Hl, Hr
 
 def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, h, AL.conj(), AL.conj()]
@@ -194,7 +221,7 @@ def calc_new_A(AL, AR, AC, C):
     Ar = AR.transpose(1, 0, 2).reshape(D, d * D)
 
     def calcnullspace(n):
-        u,s,vh = spla.svd(n, full_matrices=True)
+        u, s, vh = spla.svd(n, full_matrices=True)
 
         right_null = vh.conj().T[:,D:]
         left_null = u.conj().T[D:,:]
@@ -316,7 +343,7 @@ def calc_fidelity(X, Y):
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
   
-    q = nonuniform_mesh(npts_left=0, npts_mid=100, npts_right=20, k0=0.05, dk=0.05) * np.pi
+    q = nonuniform_mesh(npts_left=0, npts_mid=N, npts_right=20, k0=0.05, dk=0.05) * np.pi
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -379,7 +406,7 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
 
-    q = nonuniform_mesh(npts_left=10, npts_mid=100, npts_right=10, k0=0.5, dk=0.1) * np.pi
+    q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -459,9 +486,10 @@ count, d = 0, 2
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 64
-Dmax = 4
-N = 500
+D = 16
+Dmax = 32
+delta_D = 10
+N = 100
 
 si = np.array([[1, 0],[0, 1]])
 sx = np.array([[0, 1],[1, 0]])
@@ -474,7 +502,7 @@ n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
-t, V, V2 = 1, 0.5, 0
+t, V, V2 = 1, 2, 0
 
 XYZ = - (1 / 4) * (x * np.kron(sx, sx) + y * np.kron(sy, sy)) + (z / 4) * np.kron(sz, sz) #+ 0.5*(np.kron(sz, si) + np.kron(si, sz))
 
@@ -508,11 +536,16 @@ while (ep > tol or D < Dmax) and count < 1500:
     print('AR', AR.shape)
     print('C', C.shape)
 
-    # if ep < tol:
-    #     D = 2 * D
-    #     print('new D', D)
+    if ep < tol:
+        AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D)
 
-    #     AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr)
+        D = D + delta_D
+
+        print('AL new', AL.shape)
+        print('AR new', AR.shape)
+        print('C new', C.shape)
+        print('Hl new', Hl.shape)
+        print('Hr new', Hr.shape)
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL, AR, C, h, Hl, Hr, ep)
 
