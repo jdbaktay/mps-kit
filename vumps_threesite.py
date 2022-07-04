@@ -9,63 +9,6 @@ import functools
 import sys
 import os
 
-def calc_discard_weight(AL,AR,C,h,Hl,Hr):
-
-    def eff_ham(X):
-        X = X.reshape(d,D,d,D)
-
-        tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
-        indices = [(7,1,2), (8,2,4), (9,4,-3,-4), (5,6,-1,7,8,9), (5,1,3), (6,3,-2)]
-        contord = [1,2,3,4,5,6,7,8,9]
-        H1 = nc.ncon(tensors,indices,contord)
-
-        t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
-        t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
-        t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
-        t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
-        t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
-        t = t.reshape(D,d,d,D).transpose(1,0,2,3)
-
-        # print(spla.norm(t - H1))
-
-        tensors = [AL, X, h, AL.conj()]
-        indices = [(4,1,2), (5,2,6,-4), (3,-1,-3,4,5,6), (3,1,-2)]
-        contord = [1,2,3,4,5,6]
-        H2 = nc.ncon(tensors,indices,contord)
-
-        tensors = [X, AR, h, AR.conj()]
-        indices = [(4,-2,5,2), (6,2,1), (-1,-3,3,4,5,6), (3,-4,1)]
-        contord = [1,2,3,4,5,6]
-        H3 = nc.ncon(tensors,indices,contord)
-
-        tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
-        indices = [(-1,-2,7,4), (8,4,2), (9,2,1), (-3,5,6,7,8,9), (5,-4,3), (6,3,1)]
-        contord = [1,2,3,4,5,6,7,8,9]
-        H4 = nc.ncon(tensors,indices,contord)
-
-        tensors = [Hl, X]
-        indices = [(-2,1),(-1,1,-3,-4)]
-        H5 = nc.ncon(tensors,indices)
-
-        tensors = [X, Hr]
-        indices = [(-1,-2,-3,1),(1,-4)]
-        H6 = nc.ncon(tensors,indices)
-
-        return (H1+H2+H3+H4+H5).ravel()
-
-    two_site = nc.ncon([AL, C, AR], [(-1,-2,1),(1,2),(-3,2,-4)])
-
-    H = spspla.LinearOperator((d*D*d*D,d*D*d*D), matvec=eff_ham)
-    w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
-
-    u, s, vh = spla.svd(v[:,0].reshape(d*D,d*D))
-
-    t = 0
-    for i in range(D,d*D):
-        t += s[i]**2
-        
-    return t
-
 def left_ortho(A, X0, tol, stol):
     def left_fixed_point(A, B):
         def left_transfer_op(X):
@@ -105,7 +48,7 @@ def right_ortho(A, X0, tol, stol):
     A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
     return A, L
 
-def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
+def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
     indices = [(4,7,8), (5,8,10), (6,10,-2), (1,2,3,4,5,6), (1,7,9), (2,9,11), (3,11,-1)]
     contord = [7,8,9,10,11,1,2,3,4,5,6]
@@ -170,7 +113,7 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     print('(Hl|R)', np.trace(Hl @ C @ C.T.conj()))
     return Hl, Hr, e
 
-def Apply_HC(hl_mid,hr_mid,AL,AR,h,Hl,Hr,X):
+def Apply_HC(hl_mid, hr_mid, AL, AR, h, Hl, Hr, X):
     X = X.reshape(D, D)
 
     t = hl_mid.transpose(0, 1, 3, 2).reshape(D * d * d, D) @ X
@@ -211,7 +154,7 @@ def Apply_HAC(hl_mid, hr_mid, AL, AR, h, Hl, Hr ,X):
     H5 = t.reshape(D, d, D)
     return (H1 + H2 + H3 + H4 + H5).ravel()
 
-def calc_new_A(AL,AR,AC,C):
+def calc_new_A(AL, AR, AC, C):
     Al = AL.reshape(d * D, D)
     Ar = AR.transpose(1,0,2).reshape(D, d * D)
 
@@ -246,7 +189,7 @@ def calc_new_A(AL,AR,AC,C):
     AR = (urC.T.conj() @ urAC).reshape(D, d, D).transpose(1, 0, 2)
     return epl, epr, AL, AR
 
-def vumps(AL,AR,C,h,Hl,Hr,ep):
+def vumps(AL, AR, C, h, Hl, Hr, ep):
     AC = np.tensordot(C, AR, axes=(1, 1))
 
     Hl, Hr, e = HeffTerms(AL, AR, C, h, Hl, Hr, ep)
@@ -276,6 +219,60 @@ def vumps(AL,AR,C,h,Hl,Hr,ep):
 
     epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
+
+def calc_discard_weight(AL, AR, C, h, Hl, Hr):
+    def eff_ham(X):
+        X = X.reshape(d,D,d,D)
+
+        tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
+        indices = [(7,1,2), (8,2,4), (9,4,-3,-4), (5,6,-1,7,8,9), (5,1,3), (6,3,-2)]
+        contord = [1,2,3,4,5,6,7,8,9]
+        H1 = nc.ncon(tensors,indices,contord)
+
+        # t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
+        # t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
+        # t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
+        # t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
+        # t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
+        # t = t.reshape(D,d,d,D).transpose(1,0,2,3)
+        # print(spla.norm(t - H1))
+
+        tensors = [AL, X, h, AL.conj()]
+        indices = [(4,1,2), (5,2,6,-4), (3,-1,-3,4,5,6), (3,1,-2)]
+        contord = [1,2,3,4,5,6]
+        H2 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, AR, h, AR.conj()]
+        indices = [(4,-2,5,2), (6,2,1), (-1,-3,3,4,5,6), (3,-4,1)]
+        contord = [1,2,3,4,5,6]
+        H3 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
+        indices = [(-1,-2,7,4), (8,4,2), (9,2,1), (-3,5,6,7,8,9), (5,-4,3), (6,3,1)]
+        contord = [1,2,3,4,5,6,7,8,9]
+        H4 = nc.ncon(tensors,indices,contord)
+
+        tensors = [Hl, X]
+        indices = [(-2,1),(-1,1,-3,-4)]
+        H5 = nc.ncon(tensors,indices)
+
+        tensors = [X, Hr]
+        indices = [(-1,-2,-3,1),(1,-4)]
+        H6 = nc.ncon(tensors,indices)
+        return (H1+H2+H3+H4+H5).ravel()
+
+    two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
+
+    H = spspla.LinearOperator((d * D * d * D, d * D * d * D), matvec=eff_ham)
+    
+    w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
+
+    s = spla.svdvals(v[:,0].reshape(d * D, d * D))
+
+    t = 0
+    for i in range(D, d * D):
+        t += s[i]**2     
+    return t
 
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
@@ -417,40 +414,46 @@ def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
     return mesh
 
 def calc_entent(C):
-    u, s, vh = spla.svd(C)
+    s = spla.svdvals(C)
+
+    b = -np.log(s[0])
 
     entent = 0
     for i in range(np.size(s)):
         entent -= s[i]**2 * np.log(s[i]**2)
+    return entent, b 
 
-    return entent 
+def calc_fidelity(X, Y):
+    '''Presumes that MPS tensors X and Y are both properly normalized'''
+    E = np.tensordot(X,Y.conj(),axes=(0, 0)).transpose(0, 2, 1, 3).reshape(D * D, D * D)
 
-def pad_with(vector, pad_width, iaxis, kwargs):
-    vector[:pad_width[0]] = (np.random.rand() - 0.5) + 1j * (np.random.rand() - 0.5)
-    vector[-pad_width[1]:] = (np.random.rand() - 0.5) + 1j * (np.random.rand() - 0.5)
+    evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
+    return np.max(np.abs(evals))
 
-def expand(A,deltaD):
-    A_new = []
-    for i in range(A.shape[0]):
-        A_new.append(np.pad(A[i,:,:], ((0,deltaD), (0,deltaD)), pad_with))
-    return np.array(A_new)
+
 
 #######################################################################################
 
-energy, error, discard_weight, entent = [], [], [], []
+energy, error, discard_weight = [], [], []
+
+count, d = 0, 2
 
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
-d = 2
 #D = 80 + int(sys.argv[1]) * 10
 D = 32
-deltaD = 2
-count = 0
+Dmax = 4
+delta_D = 0
 N = 100
 
-si, sx = np.array([[1, 0],[0, 1]]),    np.array([[0, 1],[1, 0]])
-sy, sz = np.array([[0, -1j],[1j, 0]]), np.array([[1, 0],[0, -1]])
-sp, sm, n = 0.5*(sx + 1.0j*sy), 0.5*(sx - 1.0j*sy), 0.5*(sz + np.eye(d))
+si = np.array([[1, 0],[0, 1]])
+sx = np.array([[0, 1],[1, 0]])
+sy = np.array([[0, -1j],[1j, 0]])
+sz = np.array([[1, 0],[0, -1]])
+
+sp = 0.5 * (sx + 1.0j*sy)
+sm = 0.5 * (sx - 1.0j*sy)
+n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
 
@@ -458,27 +461,14 @@ J, g = 1, 1
 
 t, V, V2 = 2, 0, 0
 
-mu, t2, tp = 0, 0, 0
-
-#######################################################################################
-
 XYZ = x * np.kron(np.kron(sx, sx), si) + y * np.kron(np.kron(sy, sy), si) + z * np.kron(np.kron(sz, sz), si)
 
-TFI = -(J*np.kron(si, np.kron(sx, sx)) + g*np.kron(si, np.kron(sz, si)))
+TFI = -(J* np.kron(si, np.kron(sx, sx)) + g * np.kron(si, np.kron(sz, si)))
 
-nnn_ham = x * (np.kron(np.kron(sx, sz), sx) + np.kron(np.kron(sy, sz), sy)) - y * (np.kron(np.kron(sz, si), si) + np.eye(d**3))
-
-tVV2 = -t*(np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) + V*np.kron(np.kron(sz, sz), si)+ V2*np.kron(np.kron(sz, si), sz)
-
-quasi_fermi = -t * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-+ t2 * (np.kron(np.kron(sx, sz), sx) + np.kron(np.kron(sy, sz), sy)) 
-+ V * np.kron(np.kron(sz, sz), si)
-+ tp * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
-
-#########################################################################################
+tVV2 = -t * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) + V * np.kron(np.kron(sz, sz), si) + V2 * np.kron(np.kron(sz, si), sz)
 
 h = tVV2
-h = h.reshape(d,d,d,d,d,d)
+h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5 
@@ -492,7 +482,7 @@ print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np
 print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
 print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
 
-AL, AR, C, Hl, Hr, *_ = vumps(AL,AR,C,h,Hl,Hr,ep)
+AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 
 AL, C = left_ortho(AR, C, tol/100, stol)
 AR, C = right_ortho(AL, C, tol/100, stol)
@@ -501,7 +491,7 @@ while ep > tol and count < 400:
 
     print(count)
 
-    AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL,AR,C,h,Hl,Hr,ep)
+    AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL, AR, C, h, Hl, Hr, ep)
 
     print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
     print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
