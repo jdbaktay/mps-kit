@@ -212,9 +212,8 @@ def Apply_HAC(hl_mid, hr_mid, AL, AR, h, Hl, Hr ,X):
     return (H1 + H2 + H3 + H4 + H5).ravel()
 
 def calc_new_A(AL,AR,AC,C):
-
-    Al = AL.reshape(d*D,D)
-    Ar = AR.transpose(1,0,2).reshape(D,d*D)
+    Al = AL.reshape(d * D, D)
+    Ar = AR.transpose(1,0,2).reshape(D, d * D)
 
     def calcnullspace(n):
         u,s,vh = spla.svd(n, full_matrices=True)
@@ -227,11 +226,15 @@ def calc_new_A(AL,AR,AC,C):
     _, Al_right_null = calcnullspace(Al.T.conj())
     Ar_left_null, _  = calcnullspace(Ar.T.conj())
 
-    Bl = Al_right_null.T.conj()@AC.transpose(1,0,2).reshape(d * D, D)
-    Br = AC.reshape(D,d*D)@Ar_left_null.T.conj()
+    Bl = Al_right_null.T.conj() @ AC.transpose(1, 0, 2).reshape(d * D, D)
+    Br = AC.reshape(D, d * D) @ Ar_left_null.T.conj()
 
     epl = spla.norm(Bl)
     epr = spla.norm(Br)
+
+    s = spla.svdvals(C)
+    print('first svals', s[:5])
+    print('last svals', s[-5:])
 
     ulAC, plAC = spla.polar(AC.reshape(D * d, D), side='right')
     urAC, prAC = spla.polar(AC.reshape(D, d * D), side='left')
@@ -241,7 +244,6 @@ def calc_new_A(AL,AR,AC,C):
 
     AL = (ulAC @ ulC.T.conj()).reshape(D, d, D).transpose(1, 0, 2)
     AR = (urC.T.conj() @ urAC).reshape(D, d, D).transpose(1, 0, 2)
-
     return epl, epr, AL, AR
 
 def vumps(AL,AR,C,h,Hl,Hr,ep):
