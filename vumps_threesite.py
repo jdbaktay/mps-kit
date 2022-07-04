@@ -247,35 +247,34 @@ def calc_new_A(AL,AR,AC,C):
     return epl, epr, AL, AR
 
 def vumps(AL,AR,C,h,Hl,Hr,ep):
-    AC = np.tensordot(C, AR, axes=(1,1))
+    AC = np.tensordot(C, AR, axes=(1, 1))
 
-    Hl, Hr, e = HeffTerms(AL,AR,C,h,Hl,Hr,ep)
+    Hl, Hr, e = HeffTerms(AL, AR, C, h, Hl, Hr, ep)
 
     tensors = [AL, AL, h, AL.conj(), AL.conj()]
-    indices = [(4,7,8), (5,8,-3), (1,2,-2,4,5,-4), (1,7,9), (2,9,-1)]
-    contord = [7,8,9,1,2,4,5]
+    indices = [(4, 7, 8), (5, 8, -3), (1, 2, -2, 4, 5, -4), (1, 7, 9), (2, 9, -1)]
+    contord = [7, 8, 9, 1, 2, 4, 5]
     hl_mid = nc(tensors,indices,contord)
 
     tensors = [AR, AR, h, AR.conj(), AR.conj()]
-    indices = [(5,-3,8), (6,8,7), (-1,2,3,-4,5,6), (2,-2,9), (3,9,7)]
-    contord = [7,8,9,2,3,5,6]
+    indices = [(5, -3, 8), (6, 8, 7), (-1, 2, 3, -4, 5, 6), (2, -2, 9), (3, 9,7 )]
+    contord = [7, 8, 9, 2, 3, 5, 6]
     hr_mid = nc(tensors,indices,contord)
 
     f = functools.partial(Apply_HC, hl_mid, hr_mid, AL, AR, h, Hl, Hr)
     g = functools.partial(Apply_HAC, hl_mid, hr_mid, AL, AR, h, Hl, Hr)
 
-    H = spspla.LinearOperator((D*D,D*D), matvec=f)
-    w, v = spspla.eigs(H, k=1, which='SR', v0=C.ravel(), tol=ep/100, return_eigenvectors=True)
-    C = v[:,0].reshape(D,D)
+    H = spspla.LinearOperator((D * D, D * D), matvec=f)
+    w, v = spspla.eigsh(H, k=1, which='SA', v0=C.ravel(), tol=ep/100)
+    C = v[:,0].reshape(D, D)
+    print('C_eval', w[0], C.shape)
 
-    H = spspla.LinearOperator((D*d*D,D*d*D), matvec=g)
-    w, v = spspla.eigs(H, k=1, which='SR', v0=AC.ravel(), tol=ep/100, return_eigenvectors=True)
-    AC = v[:,0].reshape(D,d,D)
+    H = spspla.LinearOperator((D * d * D, D * d * D), matvec=g)
+    w, v = spspla.eigsh(H, k=1, which='SA', v0=AC.ravel(), tol=ep/100)
+    AC = v[:,0].reshape(D, d, D)
+    print('AC_eval', w[0], AC.shape)
 
-    epl, epr, AL, AR = calc_new_A(AL,AR,AC,C)
-
-    # x = calc_discard_weight(AL,AR,C,h,Hl,Hr)
-
+    epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
 
 def calc_stat_struc_fact(AL,AR,C,o1,o2,o3):
@@ -514,7 +513,7 @@ tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 d = 2
 #D = 80 + int(sys.argv[1]) * 10
-D = 25
+D = 32
 deltaD = 2
 count = 0
 
@@ -591,9 +590,11 @@ while ep > tol and count < 400:
 
     count += 1
 
-# q, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None)
+# x = calc_discard_weight(AL,AR,C,h,Hl,Hr)
 
-# q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz)
+q, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None)
+
+q, momentum = calc_momentum(AL, AR, C, sp, sm, -sz)
 
 energy = np.array(energy)
 plt.plot(energy.real)
@@ -605,8 +606,11 @@ plt.plot(error)
 plt.title('Energy: ' + 'D = ' + str(D) + ', d = ' + str(d) + ', z = ' + str(z))
 plt.show()
 
-# plt.plot(q, momentum)
-# plt.show()
+plt.plot(q, stat_struc_fact)
+plt.show()
+
+plt.plot(q, momentum)
+plt.show()
 
 # model = 'tVV2'
 
