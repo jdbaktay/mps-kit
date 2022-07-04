@@ -48,6 +48,77 @@ def right_ortho(A, X0, tol, stol):
     A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
     return A, L
 
+def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
+    Al = AL.reshape(d * D, D)
+    Ar = AR.transpose(1, 0, 2).reshape(D, d * D)
+
+    def calcnullspace(n):
+        u, s, vh = spla.svd(n, full_matrices=True)
+
+        right_null = vh.conj().T[:,D:]
+        left_null = u.conj().T[D:,:]
+
+        return left_null, right_null
+
+    _, Nl = calcnullspace(Al.T.conj())
+    Nr, _  = calcnullspace(Ar.T.conj())
+
+    def eff_ham(X):
+        X = X.reshape(d, D, d, D)
+
+        tensors = [AL, X, h, AL.conj()]
+        indices = [(4,1,2), (5,2,-3,-4), (3,-1,4,5),(3,1,-2)]
+        contord = [1,2,3,4,5]
+        H1 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, h]
+        indices = [(1,-2,2,-4), (-1,-3,1,2)]
+        contord = [1,2]
+        H2 = nc.ncon(tensors,indices,contord)
+
+        tensors = [X, AR, h, AR.conj()]
+        indices = [(-1,-2,4,2), (5,2,1), (-3,3,4,5), (3,-4,1)]
+        contord = [1,2,3,4,5]
+        H3 = nc.ncon(tensors,indices,contord)
+
+        tensors = [Hl, X]
+        indices = [(-2,1), (-1,1,-3,-4)]
+        H4 = nc.ncon(tensors,indices)
+
+        tensors = [X, Hr]
+        indices = [(-1,-2,-3,1), (1,-4)]
+        H5 = nc.ncon(tensors,indices)
+        return H1 + H2 + H3 + H4 + H5
+
+    A_two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
+    A_two_site = eff_ham(A_two_site).reshape(d * D, d * D)
+
+    t = Nl.conj().T @ A_two_site @ Nr.conj().T
+    u, s, vh = spla.svd(t, full_matrices=True)
+
+    u = u[:,:delta_D]
+    vh = vh[:delta_D,:]
+
+    expand_left = (Nl @ u).reshape(d, D, delta_D)
+    expand_right = (vh @ Nr).reshape(delta_D, d, D).transpose(1, 0, 2)
+
+    AL_new = np.concatenate((AL, expand_left), axis=2)
+    AR_new = np.concatenate((AR, expand_right), axis=1)
+
+    AL = []
+    for i in range(AL_new.shape[0]):
+        AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, 0)), mode='constant'))
+
+    AR = []
+    for i in range(AR_new.shape[0]):
+        AR.append(np.pad(AR_new[i,:,:], pad_width=((0, 0), (0, delta_D)), mode='constant'))
+
+    C = np.pad(C, pad_width=((0, delta_D), (0, delta_D)), mode='constant')
+    Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
+    Hr = np.pad(Hr, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
+
+    return np.array(AL), np.array(AR), C, Hl, Hr
+
 def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
     indices = [(4,7,8), (5,8,10), (6,10,-2), (1,2,3,4,5,6), (1,7,9), (2,9,11), (3,11,-1)]
@@ -430,8 +501,6 @@ def calc_fidelity(X, Y):
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
     return np.max(np.abs(evals))
 
-
-
 #######################################################################################
 
 energy, error, discard_weight = [], [], []
@@ -456,15 +525,12 @@ sm = 0.5 * (sx - 1.0j*sy)
 n = 0.5 * (sz + np.eye(d))
 
 x, y, z = 1, 1, 0
-
-J, g = 1, 1
-
-t, V, V2 = 2, 0, 0
-
 XYZ = x * np.kron(np.kron(sx, sx), si) + y * np.kron(np.kron(sy, sy), si) + z * np.kron(np.kron(sz, sz), si)
 
+J, g = 1, 1
 TFI = -(J* np.kron(si, np.kron(sx, sx)) + g * np.kron(si, np.kron(sz, si)))
 
+t, V, V2 = 2, 0, 0
 tVV2 = -t * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) + V * np.kron(np.kron(sz, sz), si) + V2 * np.kron(np.kron(sz, si), sz)
 
 h = tVV2
@@ -487,9 +553,22 @@ AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 AL, C = left_ortho(AR, C, tol/100, stol)
 AR, C = right_ortho(AL, C, tol/100, stol)
 
-while ep > tol and count < 400:
-
+while (ep > tol or D < Dmax) and count < 1500:
     print(count)
+    print('AL', AL.shape)
+    print('AR', AR.shape)
+    print('C', C.shape)
+
+    if ep < tol and delta_D != 0:
+        AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D)
+
+        D = D + delta_D
+
+        print('AL new', AL.shape)
+        print('AR new', AR.shape)
+        print('C new', C.shape)
+        print('Hl new', Hl.shape)
+        print('Hr new', Hr.shape)
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL, AR, C, h, Hl, Hr, ep)
 
@@ -501,37 +580,46 @@ while ep > tol and count < 400:
     print('epl', epl)
     print('epr', epr)
 
-    if np.maximum(epl, epr) < ep:
-        ep = np.maximum(epl,epr)
+    ep = np.maximum(epl, epr)
+
+    print('ep ', ep)
+    print()
 
     energy.append(e)
     error.append(ep)
 
-    AL, C = left_ortho(AR, C, tol/100, stol)
-
     count += 1
 
-# x = calc_discard_weight(AL,AR,C,h,Hl,Hr)
+x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
+discard_weight.append(x)
+print('discarded weight', x)
+
+print('final AL', AL.shape)
+print('final AR', AR.shape)
 
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
 qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
-energy = np.array(energy)
-plt.plot(energy.real)
-plt.title('Energy: ' + 'D = ' + str(D) + ', d = ' + str(d) + ', z = ' + str(z))
-plt.show()
+plt.plot(np.array(energy).real)
+plt.grid(); plt.show()
 
-error = np.array(error)
-plt.plot(error)
-plt.title('Energy: ' + 'D = ' + str(D) + ', d = ' + str(d) + ', z = ' + str(z))
-plt.show()
+plt.plot(np.array(error))
+plt.yscale('log'); plt.grid(); plt.show()
 
-plt.plot(qs, stat_struc_fact)
-plt.show()
+model = 'tVV2'
 
-plt.plot(qm, momentum)
-plt.show()
+filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+plt.plot(qs, stat_struc_fact, 'x')
+plt.xticks(np.linspace(0, 1, 5) * np.pi)
+plt.grid(); plt.show()
+
+filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+# np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
+plt.plot(qm, momentum, 'x')
+plt.xticks(np.linspace(0, 1, 5) * np.pi)
+plt.grid(); plt.show()
 
 # model = 'tVV2'
 
