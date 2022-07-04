@@ -106,7 +106,6 @@ def right_ortho(A, X0, tol, stol):
     return A, L
 
 def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
-
     tensors = [AL, AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
     indices = [(4,7,8), (5,8,10), (6,10,-2), (1,2,3,4,5,6), (1,7,9), (2,9,11), (3,11,-1)]
     contord = [7,8,9,10,11,1,2,3,4,5,6]
@@ -123,6 +122,8 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
 
     hl -= el * np.eye(D)
     hr -= er * np.eye(D)
+    print('hl == hl+', spla.norm(hl - hl.T.conj()))
+    print('hr == hr+', spla.norm(hr - hr.T.conj()))
 
     hl = 0.5 * (hl + hl.T.conj())
     hr = 0.5 * (hr + hr.T.conj())
@@ -133,35 +134,40 @@ def HeffTerms(AL,AR,C,h,Hl,Hr,ep):
     def left_env(X):
         X = X.reshape(D, D)
 
-        XT = td(X, AL, axes=(1,1))
-        XT = td(XT, AL.conj(), axes=([0,1], [1,0])).transpose(1,0)
+        t = X @ AL.transpose(1, 0, 2).reshape(D, d * D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t.reshape(D * d, D)
 
         XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
-
         return (X - XT + XR).ravel()
 
     def right_env(X):
         X = X.reshape(D, D)
 
-        XT = td(AR, X, axes=(2,0))
-        XT = td(XT, AR.conj(), axes=([2,0], [2,0]))
+        t = AR.reshape(d * D, D) @ X
+        t = t.reshape(d, D, D).transpose(1, 2, 0).reshape(D, D * d)
+        XT = t @ AR.conj().transpose(2, 0, 1).reshape(D * d, D)
 
         XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
-
         return (X - XT + XL).ravel()
 
     Ol = spspla.LinearOperator((D**2,D**2), matvec=left_env)
     Or = spspla.LinearOperator((D**2,D**2), matvec=right_env)
 
-    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100) 
-
-    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100)
+    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100, atol=ep/100)
+    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100, atol=ep/100)
 
     Hl, Hr = Hl.reshape(D,D), Hr.reshape(D,D)
+    print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
+    print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
 
     Hl = 0.5 * (Hl + Hl.T.conj())
     Hr = 0.5 * (Hr + Hr.T.conj())
 
+    print('(L|hr)', np.trace(C.T.conj() @ C @ hr))
+    print('(hl|R)', np.trace(hl @ C @ C.T.conj()))
+
+    print('(L|Hr)', np.trace(C.T.conj() @ C @ Hr))
+    print('(Hl|R)', np.trace(Hl @ C @ C.T.conj()))
     return Hl, Hr, e
 
 def Apply_HC(hl_mid,hr_mid,AL,AR,h,Hl,Hr,X):
