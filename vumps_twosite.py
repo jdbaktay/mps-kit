@@ -511,7 +511,7 @@ J, g = 1, 0.5
 TFI = - (J / 4) * np.kron(sx, sx) - (g / 4) * (np.kron(sz, si) + np.kron(si, sz))
 
 t, V, V2 = 1, 1.8, 0
-tV = (t / 2) * (np.kron(sx, sx) + np.kron(sy, sy)) - (V / 4) * np.kron(sz, sz)
+tV =  - (t / 2) * (np.kron(sx, sx) + np.kron(sy, sy)) + (V / 4) * np.kron(sz, sz)
 
 h = XYZ
 h = h.reshape(d, d, d, d)
