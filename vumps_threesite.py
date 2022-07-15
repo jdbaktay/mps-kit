@@ -108,28 +108,35 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
 
     t = Nl.conj().T @ A_two_site @ Nr.conj().T
     u, s, vh = spla.svd(t, full_matrices=True)
+    print('deltaD svals', s[:delta_D])
+    print('>deltaD svals', s[delta_D:])
 
     u = u[:,:delta_D]
     vh = vh[:delta_D,:]
 
-    expand_left = (Nl @ u).reshape(d, D, delta_D)
-    expand_right = (vh @ Nr).reshape(delta_D, d, D).transpose(1, 0, 2)
+    if delta_D > D:
+        expand_left = (Nl @ u).reshape(d, D, D)
+        expand_right = (vh @ Nr).reshape(D, d, D).transpose(1, 0, 2)
+        t = delta_D - D
+    else:
+        expand_left = (Nl @ u).reshape(d, D, delta_D)
+        expand_right = (vh @ Nr).reshape(delta_D, d, D).transpose(1, 0, 2)
+        t = 0
 
     AL_new = np.concatenate((AL, expand_left), axis=2)
     AR_new = np.concatenate((AR, expand_right), axis=1)
 
-    AL = []
+    AL, AR = [], []
+    
     for i in range(AL_new.shape[0]):
-        AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, 0)), mode='constant'))
+        AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, t)), mode='constant'))
 
-    AR = []
     for i in range(AR_new.shape[0]):
-        AR.append(np.pad(AR_new[i,:,:], pad_width=((0, 0), (0, delta_D)), mode='constant'))
+        AR.append(np.pad(AR_new[i,:,:], pad_width=((0, t), (0, delta_D)), mode='constant'))
 
     C = np.pad(C, pad_width=((0, delta_D), (0, delta_D)), mode='constant')
-    Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
-    Hr = np.pad(Hr, pad_width=((0, delta_D), (0, delta_D)), mode='mean')
-
+    Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='minimum')
+    Hr = np.pad(Hr, pad_width=((0, delta_D), (0, delta_D)), mode='minimum')
     return np.array(AL), np.array(AR), C, Hl, Hr
 
 def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
@@ -524,8 +531,8 @@ tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 #D = 80 + int(sys.argv[1]) * 10
 D = 10
-Dmax = 30
-delta_D = 5 #delta_D must be smaller than D
+Dmax = 40
+delta_D = 15
 N = 100
 
 si = np.array([[1, 0],[0, 1]])
@@ -537,19 +544,18 @@ sp = 0.5 * (sx + 1.0j*sy)
 sm = 0.5 * (sx - 1.0j*sy)
 n = 0.5 * (sz + np.eye(d))
 
-J, g = 1, 1
-TFI = -(J* np.kron(si, np.kron(sx, sx)) + g * np.kron(si, np.kron(sz, si)))
+J, g = 1, 0.5
+TFI = - (J / 4) * np.kron(si, np.kron(sx, sx)) - (g / 2) * np.kron(si, np.kron(sz, si))
 
-x, y, z = 1, 1, 0
-XYZ = (x / 4) * np.kron(np.kron(sx, sx), si) + (y / 4) * np.kron(np.kron(sy, sy), si) 
-+ (z / 4) * np.kron(np.kron(sz, sz), si)
+x, y, z = 1, 1, 1
+XYZ = -1 * (x / 4) * np.kron(np.kron(sx, sx), si) - (y / 4) * np.kron(np.kron(sy, sy), si) + (z / 4) * np.kron(np.kron(sz, sz), si)
 
 t, V, V2 = 1, 2, 0
 tVV2 = - (t / 2) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) 
 + (V / 4) * np.kron(np.kron(sz, sz), si) 
 + (V2 / 4) * np.kron(np.kron(sz, si), sz)
 
-h = tVV2
+h = TFI
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
