@@ -9,6 +9,8 @@ import functools
 import sys
 import os
 
+from scipy import stats
+
 def left_ortho(A, X0, tol, stol):
     def left_fixed_point(A, B):
         def left_transfer_op(X):
@@ -410,8 +412,7 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
     for p in q:
-        # p = q[i]
-
+        print(p)
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -430,6 +431,10 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 
 def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
+
+    # N = int(np.round(2 * correlation_length * dk))
+    # Used for computing momentum distribution using correlation length.
+    # Need to modify fxn arguments to accept corr. length and dk.
 
     q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
 
@@ -473,8 +478,6 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
     for p in q:
-        # p = q[i]
-
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -498,10 +501,9 @@ def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
             np.linspace(k_left,  k_right, npts_mid,  endpoint=False),
             np.linspace(k_right, 1.0,     npts_right)
             ))
-    # print(mesh)
-
-    # momenta = mesh * np.pi
-    # print(momenta)
+    
+    test, step = np.linspace(k_left,  k_right, npts_mid, endpoint=False, retstep=True)
+    print('step', step)
     return mesh
 
 def calc_entent(C):
@@ -521,7 +523,18 @@ def calc_fidelity(X, Y):
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
     return np.max(np.abs(evals))
 
-#######################################################################################
+def calc_correlation_length(A):
+    E = nc.ncon([A, A.conj()],[[1, -1, -3], [1, -2, -4]]).reshape(D * D, D * D)
+    evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
+    return -1/np.log(np.abs(evals[np.argmax(evals) - 1]))
+
+def checks(AL, AR, C):
+    print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
+    print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
+    print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
+    print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
+
+##############################################################################
 
 energy, error, discard_weight = [], [], []
 
@@ -530,10 +543,10 @@ count, d = 0, 2
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
 #D = 80 + int(sys.argv[1]) * 10
-D = 10
-Dmax = 40
-delta_D = 15
-N = 100
+D = 64
+Dmax = 0
+delta_D = 0
+N = 1000
 
 si = np.array([[1, 0],[0, 1]])
 sx = np.array([[0, 1],[1, 0]])
@@ -544,18 +557,22 @@ sp = 0.5 * (sx + 1.0j*sy)
 sm = 0.5 * (sx - 1.0j*sy)
 n = 0.5 * (sz + np.eye(d))
 
-J, g = 1, 0.5
-TFI = - (J / 4) * np.kron(si, np.kron(sx, sx)) - (g / 2) * np.kron(si, np.kron(sz, si))
+J, g = -1, -0.5
+TFI = ((J / 4) * np.kron(si, np.kron(sx, sx)) 
+    + (g / 2) * np.kron(si, np.kron(sz, si)))
 
-x, y, z = 1, 1, 1
-XYZ = -1 * (x / 4) * np.kron(np.kron(sx, sx), si) - (y / 4) * np.kron(np.kron(sy, sy), si) + (z / 4) * np.kron(np.kron(sz, sz), si)
+x, y, z, m = -1, -1, 0, 0
+XYZ = ((x / 4) * np.kron(np.kron(sx, sx), si) 
+    + (y / 4) * np.kron(np.kron(sy, sy), si) 
+    + (z / 4) * np.kron(np.kron(sz, sz), si) 
+    + (m/2) * np.kron(np.kron(sz, si), si))
 
-t, V, V2 = 1, 2, 0
-tVV2 = - (t / 2) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)) 
-+ (V / 4) * np.kron(np.kron(sz, sz), si) 
-+ (V2 / 4) * np.kron(np.kron(sz, si), sz)
+t, V, V2 = -1, 0.5, -0.5
+tVV2 = ((t / 2) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
+    + (V / 4) * np.kron(np.kron(sz, sz), si) 
+    + (V2 / 4) * np.kron(np.kron(sz, si), sz))
 
-h = TFI
+h = tVV2
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -564,11 +581,7 @@ Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 
 AL, C = left_ortho(A, C, tol/100, stol)
 AR, C = right_ortho(AL, C, tol/100, stol)
-
-print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
+checks(AL, AR, C)
 
 AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 
@@ -594,10 +607,7 @@ while (ep > tol or D < Dmax) and count < 1500:
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL, AR, C, h, Hl, Hr, ep)
 
-    print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-    print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-    print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-    print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
+    checks(AL, AR, C)
     print('energy', e)
     print('epl', epl)
     print('epr', epr)
@@ -618,10 +628,21 @@ print('discarded weight', x)
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
+print('V, V2:', V, V2)
+
+# AL, C = left_ortho(AR, C, tol/100, stol)
+# checks(AL, AR, C)
+
+# correlation_length = calc_correlation_length(AL)
+# print('correlation_length', correlation_length)
+
+qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
+params = stats.linregress(qs[0:50], stat_struc_fact[0:50])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
 plt.plot(np.array(energy).real)
 plt.grid(); plt.show()
@@ -631,18 +652,19 @@ plt.yscale('log'); plt.grid(); plt.show()
 
 model = 'tVV2'
 
-filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
-# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-plt.plot(qs, stat_struc_fact, 'x')
-plt.xticks(np.linspace(0, 1, 5) * np.pi)
-plt.grid(); plt.show()
-
 filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
 # np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
 plt.plot(qm, momentum, 'x')
 plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
+filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+plt.plot(qs, stat_struc_fact, 'x')
+plt.xticks(np.linspace(0, 1, 5) * np.pi)
+plt.grid(); plt.show()
+
+path = '/Users/joshuabaktay/Desktop/code/vumps'
 # path = '/home/baktay.j/vumps/data'
 
 # filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
