@@ -1,3 +1,5 @@
+# for q in `jot 10 24 199`; do python3 -Walways -Werror ../vumps_threesite.py +2.0 0.0 +1.0 $q; done
+# python3 -Walways -Werror ../vumps_threesite.py +0.25 -0.5 +1.0 67
 #cd Desktop/code/vumps 
 
 import ncon as nc
@@ -435,22 +437,24 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 def calc_momentum(AL, AR, C, o1, o2, o3, N):
     momentum = []
 
-    # N = int(np.round(2 * correlation_length * dk))
-    # Used for computing momentum distribution using correlation length.
-    # Need to modify fxn arguments to accept corr. length and dk.
-
-    # q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
-    N = int(np.ceil(correlation_length) / 2) * 2 - 1
-    print('N for n(k)', N)
-    q = np.linspace(0, 1, N) * np.pi
-
     AC = np.tensordot(AL, C, axes=(2,0))
 
-    tensors = [AC, o1, o2, AC.conj()]
+    tensors = [AC, o2, o1, AC.conj()]
     indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
     s1 = nc.ncon(tensors, indices, contord)
     print('n --> s1', s1)
+
+    # q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
+    # N = int(np.ceil(correlation_length) / 2) * 2 - 1
+
+    N = int(np.floor(correlation_length))
+    print('N for n(k)', N)
+
+    # q = np.linspace(0, 1, N) * np.pi
+    filling = s1.real
+    q = np.concatenate((np.linspace(0, filling, int(np.floor(N * filling)), endpoint=False),
+                        np.linspace(filling, 1, N - int(np.floor(N * filling))))) * np.pi
 
     def left(X,o,Y):
         indices = [(2,1,-2), (3,2), (3,1,-1)]
@@ -517,11 +521,8 @@ def calc_entent(C):
     s = spla.svdvals(C)
 
     b = -np.log(s[0])
-
-    entent = 0
-    for i in range(np.size(s)):
-        entent -= s[i]**2 * np.log(s[i]**2)
-    return entent, b 
+    entent = -sum(ss**2 * np.log(ss**2) for ss in s)
+    return entent, b
 
 def calc_fidelity(X, Y):
     '''Presumes that MPS tensors X and Y are both properly normalized'''
@@ -563,8 +564,8 @@ count, d = 0, 2
 
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
-# D = int(sys.argv[1]) * 32
-D = 48
+#D = 80 + int(sys.argv[1]) * 10
+D = int(sys.argv[4])
 Dmax = 0
 delta_D = 0
 N = 1000
@@ -588,9 +589,7 @@ XYZ = ((x / 4) * np.kron(np.kron(sx, sx), si)
     + (z / 4) * np.kron(np.kron(sz, sz), si) 
     + (m/2) * np.kron(np.kron(sz, si), si))
 
-# is the chemical potential g correctly coded? PLEASE CHECK AND RE-CHECK
-# t, V, V2, g = -1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-t, V, V2, g = -1, -1.9, 0, 0
+t, V, V2, g = -1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
 tVV2 = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
       + (t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
       + (V / 8) * np.kron(np.kron(sz, sz), si)
@@ -655,30 +654,32 @@ while (ep > tol or D < Dmax) and count < 5000:
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-print('V, V2, g:', V, V2, g)
-# AL, C = left_ortho(AR, C, tol/100, stol)
-# checks(AL, AR, C)
+print('V, V2:', V, V2)
+
+#AL, C = left_ortho(AR, C, tol/100, stol)
+checks(AL, AR, C)
 
 # correlation_length = calc_correlation_length(AL)
 # print('correlation_length', correlation_length)
 correlation_length = my_corr_length(AL, C, tol/100)
 print('correlation_length', correlation_length)
+vonneumann = calc_entent(C)
+print('entanglement entropy', *vonneumann)
 
 qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
-
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-# params = stats.linregress(qs[0:N//8], stat_struc_fact[0:N//8])
-# print('K = ', (2 * np.pi * params.slope))
-# print('R = ', params.rvalue)
+params = stats.linregress(qs[:8], stat_struc_fact[:8])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
-# params = stats.linregress(qs[0:N//4], stat_struc_fact[0:N//4])
-# print('K = ', (2 * np.pi * params.slope))
-# print('R = ', params.rvalue)
+params = stats.linregress(qs[:16], stat_struc_fact[:16])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
-# params = stats.linregress(qs[0:N//2], stat_struc_fact[0:N//2])
-# print('K = ', (2 * np.pi * params.slope))
-# print('R = ', params.rvalue)
+params = stats.linregress(qs[:32], stat_struc_fact[:32])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
 # plt.plot(np.array(energy).real)
 # plt.grid(); plt.show()
@@ -691,14 +692,14 @@ qm /= np.pi
 qs /= np.pi
 
 filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-# np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
-plt.plot(qm, momentum, 'x')
-plt.grid(); plt.show()
+np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
+# plt.plot(qm, momentum, 'x')
+# plt.grid(); plt.show()
 
 filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-plt.plot(qs, stat_struc_fact, 'x')
-plt.grid(); plt.show()
+np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+# plt.plot(qs, stat_struc_fact, 'x')
+# plt.grid(); plt.show()
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
 # path = '/home/baktay.j/vumps/data'
@@ -706,8 +707,8 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 # filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), energy)
 
-filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-np.savetxt(os.path.join(path, filename), error)
+# filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# np.savetxt(os.path.join(path, filename), error)
 
 # filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), discard_weight)
