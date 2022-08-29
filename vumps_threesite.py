@@ -370,7 +370,10 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
   
-    q = nonuniform_mesh(npts_left=0, npts_mid=N, npts_right=20, k0=0.05, dk=0.05) * np.pi
+    # q = nonuniform_mesh(npts_left=0, npts_mid=N, npts_right=20, k0=0.05, dk=0.05) * np.pi
+    N = int(np.floor(correlation_length))
+    print('N for s(k)', N)
+    q = np.linspace(0, 1, N) * np.pi
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
@@ -378,7 +381,7 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
 
     tensors = [AC, o1, o2, AC.conj()]
-    indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
+    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
     s1 = nc.ncon(tensors, indices, contord)
     print('s --> s1', s1)
@@ -412,7 +415,7 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
     for p in q:
-        print(p)
+        print('s(', p, ')')
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -436,22 +439,25 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     # Used for computing momentum distribution using correlation length.
     # Need to modify fxn arguments to accept corr. length and dk.
 
-    q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
+    # q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
+    N = int(np.ceil(correlation_length) / 2) * 2 - 1
+    print('N for n(k)', N)
+    q = np.linspace(0, 1, N) * np.pi
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
     tensors = [AC, o1, o2, AC.conj()]
-    indices =[(3,1,2), (4,3), (5,4), (5,1,2)]
+    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
     contord = [1,2,3,4,5]
     s1 = nc.ncon(tensors, indices, contord)
     print('n --> s1', s1)
 
     def left(X,o,Y):
-        indices =[(2,1,-2), (3,2), (3,1,-1)]
+        indices = [(2,1,-2), (3,2), (3,1,-1)]
         return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     def right(X,o,Y):
-        indices =[(2,-1,1), (3,2), (3,-2,1)]
+        indices = [(2,-1,1), (3,2), (3,-2,1)]
         return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
     s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
@@ -478,6 +484,7 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
     for p in q:
+        print('n(', p, ')')
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -528,6 +535,20 @@ def calc_correlation_length(A):
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
     return -1/np.log(np.abs(evals[np.argmax(evals) - 1]))
 
+def my_corr_length(A, X0, tol):
+    '''NEED TO SAVE ALL THREE EIGENVALUES TO DO FES.'''
+    def left_transfer_op(X):
+        tensors = [A, X.reshape(D, D), A.conj()]
+        indices = [(1, 2, -2), (3, 2), (1, 3, -1)]
+        contord = [2, 3, 1]
+        return nc.ncon(tensors,indices,contord).ravel()
+
+    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
+    # k must be LARGER THAN OR EQUAL TO 2 so return statement makes sense
+    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, return_eigenvectors=False)
+    print('argmax', np.argmax(evals), evals)
+    return -1.0 / np.log(np.abs(evals[-2]))
+
 def checks(AL, AR, C):
     print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
     print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
@@ -542,8 +563,8 @@ count, d = 0, 2
 
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
-#D = 80 + int(sys.argv[1]) * 10
-D = 64
+# D = int(sys.argv[1]) * 32
+D = 48
 Dmax = 0
 delta_D = 0
 N = 1000
@@ -567,10 +588,16 @@ XYZ = ((x / 4) * np.kron(np.kron(sx, sx), si)
     + (z / 4) * np.kron(np.kron(sz, sz), si) 
     + (m/2) * np.kron(np.kron(sz, si), si))
 
-t, V, V2 = -1, 0.5, -0.5
-tVV2 = ((t / 2) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-    + (V / 4) * np.kron(np.kron(sz, sz), si) 
-    + (V2 / 4) * np.kron(np.kron(sz, si), sz))
+# is the chemical potential g correctly coded? PLEASE CHECK AND RE-CHECK
+# t, V, V2, g = -1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+t, V, V2, g = -1, -1.9, 0, 0
+tVV2 = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
+      + (t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
+      + (V / 8) * np.kron(np.kron(sz, sz), si)
+      + (V / 8) * np.kron(si, np.kron(sz, sz))
+      + (V2 / 4) * np.kron(np.kron(sz, si), sz)
+      + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
+                   + np.kron(np.kron(si, si), sz)))
 
 h = tVV2
 h = h.reshape(d, d, d, d, d, d)
@@ -588,7 +615,7 @@ AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 AL, C = left_ortho(AR, C, tol/100, stol)
 AR, C = right_ortho(AL, C, tol/100, stol)
 
-while (ep > tol or D < Dmax) and count < 1500:
+while (ep > tol or D < Dmax) and count < 5000:
     print(count)
     print('AL', AL.shape)
     print('AR', AR.shape)
@@ -596,7 +623,6 @@ while (ep > tol or D < Dmax) and count < 1500:
 
     if ep < tol and delta_D != 0:
         AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D)
-
         D = D + delta_D
 
         print('AL new', AL.shape)
@@ -622,46 +648,56 @@ while (ep > tol or D < Dmax) and count < 1500:
 
     count += 1
 
-x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
-discard_weight.append(x)
-print('discarded weight', x)
+# DONT REALLY NEED THIS RIGHT NOW, COMMENTED OUT BECAUSE IT'S TOO SLOW
+# x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
+# discard_weight.append(x)
+# print('discarded weight', x)
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-print('V, V2:', V, V2)
-
+print('V, V2, g:', V, V2, g)
 # AL, C = left_ortho(AR, C, tol/100, stol)
 # checks(AL, AR, C)
 
 # correlation_length = calc_correlation_length(AL)
 # print('correlation_length', correlation_length)
+correlation_length = my_corr_length(AL, C, tol/100)
+print('correlation_length', correlation_length)
 
 qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-params = stats.linregress(qs[0:50], stat_struc_fact[0:50])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+# params = stats.linregress(qs[0:N//8], stat_struc_fact[0:N//8])
+# print('K = ', (2 * np.pi * params.slope))
+# print('R = ', params.rvalue)
 
-plt.plot(np.array(energy).real)
-plt.grid(); plt.show()
+# params = stats.linregress(qs[0:N//4], stat_struc_fact[0:N//4])
+# print('K = ', (2 * np.pi * params.slope))
+# print('R = ', params.rvalue)
 
-plt.plot(np.array(error))
-plt.yscale('log'); plt.grid(); plt.show()
+# params = stats.linregress(qs[0:N//2], stat_struc_fact[0:N//2])
+# print('K = ', (2 * np.pi * params.slope))
+# print('R = ', params.rvalue)
+
+# plt.plot(np.array(energy).real)
+# plt.grid(); plt.show()
+
+# plt.plot(np.array(error))
+# plt.yscale('log'); plt.grid(); plt.show()
 
 model = 'tVV2'
+qm /= np.pi
+qs /= np.pi
 
-filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
 # np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
 plt.plot(qm, momentum, 'x')
-plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
-filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
+filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
 # np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
 plt.plot(qs, stat_struc_fact, 'x')
-plt.xticks(np.linspace(0, 1, 5) * np.pi)
 plt.grid(); plt.show()
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
@@ -670,8 +706,8 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 # filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), energy)
 
-# filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), error)
+filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+np.savetxt(os.path.join(path, filename), error)
 
 # filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), discard_weight)
@@ -694,6 +730,7 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 
 # filename = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), C)
+
 
 
 
