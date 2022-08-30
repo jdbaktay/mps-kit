@@ -319,41 +319,77 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
     def eff_ham(X):
         X = X.reshape(d, D, d, D)
 
-        tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
-        indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
-        contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        H1 = nc.ncon(tensors,indices,contord)
+        # tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
+        # indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
+        # contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        # H1 = nc.ncon(tensors,indices,contord)
 
-        # t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
-        # t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
-        # t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
-        # t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
-        # t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
-        # t = t.reshape(D,d,d,D).transpose(1,0,2,3)
-        # print(spla.norm(t - H1))
+        t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
+        t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
+        t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
+        t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
+        t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
+        H1 = t.reshape(D,d,d,D).transpose(1,0,2,3)
 
-        tensors = [AL, X, h, AL.conj()]
-        indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
-        contord = [1, 2, 3, 4, 5, 6] 
-        H2 = nc.ncon(tensors,indices,contord)
+        # tensors = [AL, X, h, AL.conj()]
+        # indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
+        # contord = [1, 2, 3, 4, 5, 6] 
+        # H2 = nc.ncon(tensors,indices,contord)
 
-        tensors = [X, AR, h, AR.conj()]
-        indices = [(4, -2, 5, 2), (6, 2, 1), (-1, -3, 3, 4, 5, 6), (3, -4, 1)]
-        contord = [1, 2, 3, 4, 5, 6]
-        H3 = nc.ncon(tensors,indices,contord)
+        t = (AL.reshape(d * D, D) 
+                              @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D))
+        t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
+        t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+        t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
+        t = AL.conj().reshape(d * D, D).T @ t.reshape(d * D, d * d * D)
+        H2 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
 
-        tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
-        indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
-        contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        H4 = nc.ncon(tensors,indices,contord)
+        # tensors = [X, AR, h, AR.conj()]
+        # indices = [(4, -2, 5, 2), (6, 2, 1), (-1, -3, 3, 4, 5, 6), (3, -4, 1)]
+        # contord = [1, 2, 3, 4, 5, 6]
+        # H3 = nc.ncon(tensors,indices,contord)
 
-        tensors = [Hl, X]
-        indices = [(-2, 1), (-1, 1, -3, -4)]
-        H5 = nc.ncon(tensors,indices)
+        t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
+        t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+        t = t.reshape(d, d, d, D, D).transpose(0, 1, 3, 2, 4)
+        t = (t.reshape(d * d * D, d * D) 
+                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
+        H3 = t.reshape(d, d, D, D).transpose(0, 2, 1, 3)
 
-        tensors = [X, Hr]
-        indices = [(-1, -2, -3, 1), (1, -4)]
-        H6 = nc.ncon(tensors,indices)
+        # tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
+        # indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
+        # contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        # H4 = nc.ncon(tensors,indices,contord)
+
+        t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        t = (t.reshape(d * D * d * d, D) 
+                                @ AR.transpose(1, 0, 2).reshape(D, d * D))
+        t = t.reshape(d * D, d, d, d, D).transpose(0, 4, 1, 2, 3)
+        t = t.reshape(d * D * D, d**3) @ h.reshape(d**3, d**3).T
+        t = t.reshape(d * D, D, d**2, d).transpose(0, 2, 3, 1)
+        t = (t.reshape(d * D * d * d, d * D) 
+                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
+        t = (t.reshape(d * D * d, d * D) 
+                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
+        H4 = t.reshape(d, D, d, D)
+
+        # tensors = [Hl, X]
+        # indices = [(-2, 1), (-1, 1, -3, -4)]
+        # H5 = nc.ncon(tensors,indices)
+
+        t = Hl @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D)
+        H5 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
+
+        # tensors = [X, Hr]
+        # indices = [(-1, -2, -3, 1), (1, -4)]
+        # H6 = nc.ncon(tensors,indices)
+
+        t = X.reshape(d * D * d, D) @ Hr
+        H6 = t.reshape(d, D, d, D)
+
+        # print(spla.norm(t - H6))
+
         return (H1 + H2 + H3 + H4 + H5 + H6).ravel()
 
     two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
@@ -647,10 +683,9 @@ while (ep > tol or D < Dmax) and count < 5000:
 
     count += 1
 
-# DONT REALLY NEED THIS RIGHT NOW, COMMENTED OUT BECAUSE IT'S TOO SLOW
-# x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
-# discard_weight.append(x)
-# print('discarded weight', x)
+x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
+discard_weight.append(x)
+print('discarded weight', x)
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
@@ -659,47 +694,46 @@ print('V, V2:', V, V2)
 #AL, C = left_ortho(AR, C, tol/100, stol)
 checks(AL, AR, C)
 
-# correlation_length = calc_correlation_length(AL)
-# print('correlation_length', correlation_length)
 correlation_length = my_corr_length(AL, C, tol/100)
 print('correlation_length', correlation_length)
+
 vonneumann = calc_entent(C)
 print('entanglement entropy', *vonneumann)
 
 qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-params = stats.linregress(qs[:8], stat_struc_fact[:8])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+# params = stats.linregress(qs[:8], stat_struc_fact[:8])
+# print('K = ', (2 * np.pi * params.slope))
+# print('R = ', params.rvalue)
 
-params = stats.linregress(qs[:16], stat_struc_fact[:16])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+# params = stats.linregress(qs[:16], stat_struc_fact[:16])
+# print('K = ', (2 * np.pi * params.slope))
+# print('R = ', params.rvalue)
 
-params = stats.linregress(qs[:32], stat_struc_fact[:32])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+# params = stats.linregress(qs[:32], stat_struc_fact[:32])
+# print('K = ', (2 * np.pi * params.slope))
+# print('R = ', params.rvalue)
 
-# plt.plot(np.array(energy).real)
-# plt.grid(); plt.show()
+plt.plot(np.array(energy).real)
+plt.grid(); plt.show()
 
-# plt.plot(np.array(error))
-# plt.yscale('log'); plt.grid(); plt.show()
+plt.plot(np.array(error))
+plt.yscale('log'); plt.grid(); plt.show()
 
 model = 'tVV2'
 qm /= np.pi
 qs /= np.pi
 
-filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
-# plt.plot(qm, momentum, 'x')
-# plt.grid(); plt.show()
+# filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
+# np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
+plt.plot(qm, momentum, 'x')
+plt.grid(); plt.show()
 
-filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-# plt.plot(qs, stat_struc_fact, 'x')
-# plt.grid(); plt.show()
+# filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
+# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+plt.plot(qs, stat_struc_fact, 'x')
+plt.grid(); plt.show()
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
 # path = '/home/baktay.j/vumps/data'
