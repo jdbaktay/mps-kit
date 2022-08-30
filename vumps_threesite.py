@@ -319,22 +319,12 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
     def eff_ham(X):
         X = X.reshape(d, D, d, D)
 
-        # tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
-        # indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
-        # contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        # H1 = nc.ncon(tensors,indices,contord)
-
         t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
         t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
         t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
         t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
         t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
         H1 = t.reshape(D,d,d,D).transpose(1,0,2,3)
-
-        # tensors = [AL, X, h, AL.conj()]
-        # indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
-        # contord = [1, 2, 3, 4, 5, 6] 
-        # H2 = nc.ncon(tensors,indices,contord)
 
         t = (AL.reshape(d * D, D) 
                               @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D))
@@ -344,11 +334,6 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
         t = AL.conj().reshape(d * D, D).T @ t.reshape(d * D, d * d * D)
         H2 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
 
-        # tensors = [X, AR, h, AR.conj()]
-        # indices = [(4, -2, 5, 2), (6, 2, 1), (-1, -3, 3, 4, 5, 6), (3, -4, 1)]
-        # contord = [1, 2, 3, 4, 5, 6]
-        # H3 = nc.ncon(tensors,indices,contord)
-
         t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
         t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
         t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
@@ -356,11 +341,6 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
         t = (t.reshape(d * d * D, d * D) 
                             @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
         H3 = t.reshape(d, d, D, D).transpose(0, 2, 1, 3)
-
-        # tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
-        # indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
-        # contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        # H4 = nc.ncon(tensors,indices,contord)
 
         t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
         t = (t.reshape(d * D * d * d, D) 
@@ -374,22 +354,11 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
                             @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
         H4 = t.reshape(d, D, d, D)
 
-        # tensors = [Hl, X]
-        # indices = [(-2, 1), (-1, 1, -3, -4)]
-        # H5 = nc.ncon(tensors,indices)
-
         t = Hl @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D)
         H5 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
 
-        # tensors = [X, Hr]
-        # indices = [(-1, -2, -3, 1), (1, -4)]
-        # H6 = nc.ncon(tensors,indices)
-
         t = X.reshape(d * D * d, D) @ Hr
         H6 = t.reshape(d, D, d, D)
-
-        # print(spla.norm(t - H6))
-
         return (H1 + H2 + H3 + H4 + H5 + H6).ravel()
 
     two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
