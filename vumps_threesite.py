@@ -49,7 +49,7 @@ def left_ortho(A, X0, tol, stol):
 
 def right_ortho(A, X0, tol, stol):
     A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol, stol)
-    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))   
+    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))
     return A, L
 
 def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
@@ -65,7 +65,7 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
         return left_null, right_null
 
     _, Nl = calcnullspace(Al.T.conj())
-    Nr, _  = calcnullspace(Ar.T.conj())
+    Nr, _ = calcnullspace(Ar.T.conj())
 
     def eff_ham(X):
         X = X.reshape(d, D, d, D)
@@ -85,7 +85,7 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
 
         tensors = [AL, X, h, AL.conj()]
         indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
-        contord = [1, 2, 3, 4, 5, 6] 
+        contord = [1, 2, 3, 4, 5, 6]
         H2 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, AR, h, AR.conj()]
@@ -115,8 +115,8 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     print('deltaD svals', s[:delta_D])
     print('>deltaD svals', s[delta_D:])
 
-    u = u[:,:delta_D]
-    vh = vh[:delta_D,:]
+    u = u[:, :delta_D]
+    vh = vh[:delta_D, :]
 
     if delta_D > D:
         expand_left = (Nl @ u).reshape(d, D, D)
@@ -131,7 +131,7 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     AR_new = np.concatenate((AR, expand_right), axis=1)
 
     AL, AR = [], []
-    
+
     for i in range(AL_new.shape[0]):
         AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, t)), mode='constant'))
 
@@ -364,19 +364,16 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
     two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
 
     H = spspla.LinearOperator((d * D * d * D, d * D * d * D), matvec=eff_ham)
-    
+
     w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
 
-    s = spla.svdvals(v[:,0].reshape(d * D, d * D))
+    s = spla.svdvals(v[:, 0].reshape(d * D, d * D))
 
-    t = 0
-    for i in range(D, d * D):
-        t += s[i]**2     
-    return t
+    return sum(ss**2 for ss in s[D:])
 
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
-  
+
     # q = nonuniform_mesh(npts_left=0, npts_mid=N, npts_right=20, k0=0.05, dk=0.05) * np.pi
     N = int(np.floor(correlation_length))
     print('N for s(k)', N)
@@ -517,7 +514,7 @@ def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
             np.linspace(k_left,  k_right, npts_mid,  endpoint=False),
             np.linspace(k_right, 1.0,     npts_right)
             ))
-    
+
     test, step = np.linspace(k_left,  k_right, npts_mid, endpoint=False, retstep=True)
     print('step', step)
     return mesh
@@ -563,7 +560,7 @@ def checks(AL, AR, C):
 
 ##############################################################################
 
-energy, error, discard_weight = [], [], []
+energy, error = [], []
 
 count, d = 0, 2
 
@@ -607,7 +604,7 @@ h = tVV2
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
-C = np.random.rand(D, D) - 0.5 
+C = np.random.rand(D, D) - 0.5
 Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 
 AL, C = left_ortho(A, C, tol/100, stol)
@@ -652,57 +649,56 @@ while (ep > tol or D < Dmax) and count < 5000:
 
     count += 1
 
-x = calc_discard_weight(AL, AR, C, h, Hl, Hr)
-discard_weight.append(x)
-print('discarded weight', x)
-
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-print('V, V2:', V, V2)
+print('V, V2, g:', V, V2, g)
 
 #AL, C = left_ortho(AR, C, tol/100, stol)
 checks(AL, AR, C)
 
 correlation_length = my_corr_length(AL, C, tol/100)
-print('correlation_length', correlation_length)
+print('correlation length', correlation_length)
 
 vonneumann = calc_entent(C)
 print('entanglement entropy', *vonneumann)
 
+disc_weight = calc_discard_weight(AL, AR, C, h, Hl, Hr)
+print('discarded weight', disc_weight)
+
 qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-# params = stats.linregress(qs[:8], stat_struc_fact[:8])
-# print('K = ', (2 * np.pi * params.slope))
-# print('R = ', params.rvalue)
+params = stats.linregress(qs[:8], stat_struc_fact[:8])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
-# params = stats.linregress(qs[:16], stat_struc_fact[:16])
-# print('K = ', (2 * np.pi * params.slope))
-# print('R = ', params.rvalue)
+params = stats.linregress(qs[:16], stat_struc_fact[:16])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
-# params = stats.linregress(qs[:32], stat_struc_fact[:32])
-# print('K = ', (2 * np.pi * params.slope))
-# print('R = ', params.rvalue)
+params = stats.linregress(qs[:32], stat_struc_fact[:32])
+print('K = ', (2 * np.pi * params.slope))
+print('R = ', params.rvalue)
 
-plt.plot(np.array(energy).real)
-plt.grid(); plt.show()
+# plt.plot(np.array(energy).real)
+# plt.grid(); plt.show()
 
-plt.plot(np.array(error))
-plt.yscale('log'); plt.grid(); plt.show()
+# plt.plot(np.array(error))
+# plt.yscale('log'); plt.grid(); plt.show()
 
 model = 'tVV2'
 qm /= np.pi
 qs /= np.pi
 
-# filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-# np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
-plt.plot(qm, momentum, 'x')
-plt.grid(); plt.show()
+filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
+np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
+# plt.plot(qm, momentum, 'x')
+# plt.grid(); plt.show()
 
-# filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-plt.plot(qs, stat_struc_fact, 'x')
-plt.grid(); plt.show()
+filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
+np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+# plt.plot(qs, stat_struc_fact, 'x')
+# plt.grid(); plt.show()
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
 # path = '/home/baktay.j/vumps/data'
@@ -714,7 +710,7 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 # np.savetxt(os.path.join(path, filename), error)
 
 # filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), discard_weight)
+# np.savetxt(os.path.join(path, filename), disc_weight)
 
 # filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)))
@@ -734,6 +730,7 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 
 # filename = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), C)
+
 
 
 
