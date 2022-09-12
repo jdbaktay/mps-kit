@@ -566,7 +566,6 @@ count, d = 0, 2
 
 tol, stol, ep = 1e-12, 1e-12, 1e-2
 
-#D = 80 + int(sys.argv[1]) * 10
 D = int(sys.argv[4])
 Dmax = 0
 delta_D = 0
@@ -600,7 +599,15 @@ tVV2 = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
       + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
                    + np.kron(np.kron(si, si), sz)))
 
-h = tVV2
+t, t2, tc, g = -1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+tt2tc = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
+      + (t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
+      + (t2 / 16) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
+      + (tc / 32) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
+      + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
+                   + np.kron(np.kron(si, si), sz)))
+
+h = tt2tc
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -680,25 +687,25 @@ params = stats.linregress(qs[:32], stat_struc_fact[:32])
 print('K = ', (2 * np.pi * params.slope))
 print('R = ', params.rvalue)
 
-# plt.plot(np.array(energy).real)
-# plt.grid(); plt.show()
+plt.plot(np.array(energy).real)
+plt.grid(); plt.show()
 
-# plt.plot(np.array(error))
-# plt.yscale('log'); plt.grid(); plt.show()
+plt.plot(np.array(error))
+plt.yscale('log'); plt.grid(); plt.show()
 
 model = 'tVV2'
 qm /= np.pi
 qs /= np.pi
 
 filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
-# plt.plot(qm, momentum, 'x')
-# plt.grid(); plt.show()
+# np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
+plt.plot(qm, momentum, 'x')
+plt.grid(); plt.show()
 
 filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
-np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-# plt.plot(qs, stat_struc_fact, 'x')
-# plt.grid(); plt.show()
+# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
+plt.plot(qs, stat_struc_fact, 'x')
+plt.grid(); plt.show()
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
 # path = '/home/baktay.j/vumps/data'
