@@ -1,6 +1,6 @@
 # for q in `jot 10 24 199`; do python3 -Walways -Werror ../vumps_threesite.py +2.0 0.0 +1.0 $q; done
 # python3 -Walways -Werror ../vumps_threesite.py +0.25 -0.5 +1.0 67
-#cd Desktop/code/vumps 
+# cd Desktop/code/vumps
 
 import ncon as nc
 import numpy as np
@@ -607,7 +607,7 @@ tt2tc = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
       + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
                    + np.kron(np.kron(si, si), sz)))
 
-h = tt2tc
+h = tVV2
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -697,17 +697,17 @@ model = 'tVV2'
 qm /= np.pi
 qs /= np.pi
 
-filename = "%s_momentum_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
+filename = "%s_nk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
 # np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
 plt.plot(qm, momentum, 'x')
 plt.grid(); plt.show()
 
-filename = "%s_statstrucfact_%.2f_%.2f_%03i_.dat" % (model, V, V2, D)
+filename = "%s_sk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
 # np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
 plt.plot(qs, stat_struc_fact, 'x')
 plt.grid(); plt.show()
 
-path = '/Users/joshuabaktay/Desktop/code/vumps'
+path = ''    # /Users/joshuabaktay/Desktop/code/vumps'
 # path = '/home/baktay.j/vumps/data'
 
 # filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
@@ -725,21 +725,15 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 # filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)))
 
-# filename = "%s_AL_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# with open(os.path.join(path, filename), 'a') as outfile:
-#     for data_slice in AL:
-#         np.savetxt(outfile, data_slice)
+filename = "%s_AL_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+with open(os.path.join(path, filename), 'a') as outfile:
+    for data_slice in AL:
+        np.savetxt(outfile, data_slice)
 
-# filename = "%s_AR_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# with open(os.path.join(path, filename), 'a') as outfile:
-#     for data_slice in AR:
-#         np.savetxt(outfile, data_slice)
+filename = "%s_AR_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+with open(os.path.join(path, filename), 'a') as outfile:
+    for data_slice in AR:
+        np.savetxt(outfile, data_slice)
 
-# filename = "%s_C_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), C)
-
-
-
-
-
-
+filename = "%s_C_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+np.savetxt(os.path.join(path, filename), C)
