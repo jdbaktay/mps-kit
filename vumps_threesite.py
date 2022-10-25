@@ -607,7 +607,7 @@ tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)
        + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
                     + np.kron(np.kron(si, si), sz)))
 
-h = tVV2
+h = tt2tc
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -658,7 +658,9 @@ while (ep > tol or D < Dmax) and count < 5000:
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-print('V, V2, g:', V, V2, g)
+# print('V, V2, g:', V, V2, g)
+print('t2, tc, g:', t2, tc, g)
+
 
 #AL, C = left_ortho(AR, C, tol/100, stol)
 checks(AL, AR, C)
@@ -693,47 +695,53 @@ print('R = ', params.rvalue)
 # plt.plot(np.array(error))
 # plt.yscale('log'); plt.grid(); plt.show()
 
-model = 'tVV2'
+model = 'tt2tc'
 qm /= np.pi
 qs /= np.pi
 
-filename = "%s_nk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
+# filename = "%s_nk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
 # np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
-plt.plot(qm, momentum, 'x')
-plt.grid(); plt.show()
+# plt.plot(qm, momentum, 'x')
+# plt.grid(); plt.show()
 
-filename = "%s_sk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
+# filename = "%s_sk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
 # np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-plt.plot(qs, stat_struc_fact, 'x')
-plt.grid(); plt.show()
+# plt.plot(qs, stat_struc_fact, 'x')
+# plt.grid(); plt.show()
 
-path = ''    # /Users/joshuabaktay/Desktop/code/vumps'
-# path = '/home/baktay.j/vumps/data'
+# path = ''    # /Users/joshuabaktay/Desktop/code/vumps' 
+path = '/home/baktay.j/vumps/data'
 
-# filename = "%s_energy_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename = "%s_energy_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
 # np.savetxt(os.path.join(path, filename), energy)
 
-# filename = "%s_error_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
+# filename = "%s_error_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
 # np.savetxt(os.path.join(path, filename), error)
+
+# filename = "%s_entent_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# np.savetxt(os.path.join(path, filename), np.array(vonneumann))
+
+# filename = "%s_evals_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# np.savetxt(os.path.join(path, filename), np.array(evals))
 
 # filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), disc_weight)
 
-# filename = "%s_statstrucfact_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)))
+# filename = "%s_statstrucfact_%.2f_%.2f_%.2f_%03i_.dat" % (model, t2, tc, g, D)
+# np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
 
-# filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)))
+# filename = "%s_momentum_%.2f_%.2f_%.2f_%03i_.dat" % (model, t2, tc, g, D)
+# np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)), fmt='%s %s')
 
-# filename = "%s_AL_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# filename = "%s_AL_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
 # with open(os.path.join(path, filename), 'a') as outfile:
 #     for data_slice in AL:
 #         np.savetxt(outfile, data_slice)
 
-# filename = "%s_AR_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# filename = "%s_AR_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
 # with open(os.path.join(path, filename), 'a') as outfile:
 #     for data_slice in AR:
 #         np.savetxt(outfile, data_slice)
 
-# filename = "%s_C_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# filename = "%s_C_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
 # np.savetxt(os.path.join(path, filename), C)
