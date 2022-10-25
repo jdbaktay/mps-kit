@@ -586,28 +586,28 @@ TFI = ((J / 4) * np.kron(si, np.kron(sx, sx))
 
 x, y, z, m = -1, -1, 0, 0
 XYZ = ((x / 4) * np.kron(np.kron(sx, sx), si) 
-    + (y / 4) * np.kron(np.kron(sy, sy), si) 
-    + (z / 4) * np.kron(np.kron(sz, sz), si) 
-    + (m/2) * np.kron(np.kron(sz, si), si))
+     + (y / 4) * np.kron(np.kron(sy, sy), si) 
+     + (z / 4) * np.kron(np.kron(sz, sz), si) 
+     + (m/2) * np.kron(np.kron(sz, si), si))
 
-t, V, V2, g = -1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-tVV2 = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-      + (t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
+t, V, V2, g = 1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+tVV2 = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
+      + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
       + (V / 8) * np.kron(np.kron(sz, sz), si)
       + (V / 8) * np.kron(si, np.kron(sz, sz))
       + (V2 / 4) * np.kron(np.kron(sz, si), sz)
       + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
                    + np.kron(np.kron(si, si), sz)))
 
-t, t2, tc, g = -1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-tt2tc = ((t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-      + (t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
-      + (t2 / 16) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
-      + (tc / 32) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
-      + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
-                   + np.kron(np.kron(si, si), sz)))
+t, t2, tc, g = 1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
+       + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
+       + (t2 / 2) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
+       + (tc / 4) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
+       + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
+                    + np.kron(np.kron(si, si), sz)))
 
-h = tVV2
+h = tt2tc
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -658,7 +658,8 @@ while (ep > tol or D < Dmax) and count < 5000:
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-print('V, V2, g:', V, V2, g)
+# print('V, V2, g:', V, V2, g)
+print('t2, tc, g:', t, V2, g)
 
 #AL, C = left_ortho(AR, C, tol/100, stol)
 checks(AL, AR, C)
@@ -687,11 +688,11 @@ params = stats.linregress(qs[:32], stat_struc_fact[:32])
 print('K = ', (2 * np.pi * params.slope))
 print('R = ', params.rvalue)
 
-plt.plot(np.array(energy).real)
-plt.grid(); plt.show()
+# plt.plot(np.array(energy).real)
+# plt.grid(); plt.show()
 
-plt.plot(np.array(error))
-plt.yscale('log'); plt.grid(); plt.show()
+# plt.plot(np.array(error))
+# plt.yscale('log'); plt.grid(); plt.show()
 
 model = 'tVV2'
 qm /= np.pi
@@ -725,15 +726,15 @@ path = ''    # /Users/joshuabaktay/Desktop/code/vumps'
 # filename = "%s_momentum_%.2f_%.2f_%i_.dat" % (model, V, V2, D)
 # np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)))
 
-filename = "%s_AL_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
-with open(os.path.join(path, filename), 'a') as outfile:
-    for data_slice in AL:
-        np.savetxt(outfile, data_slice)
+# filename = "%s_AL_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# with open(os.path.join(path, filename), 'a') as outfile:
+#     for data_slice in AL:
+#         np.savetxt(outfile, data_slice)
 
-filename = "%s_AR_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
-with open(os.path.join(path, filename), 'a') as outfile:
-    for data_slice in AR:
-        np.savetxt(outfile, data_slice)
+# filename = "%s_AR_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# with open(os.path.join(path, filename), 'a') as outfile:
+#     for data_slice in AR:
+#         np.savetxt(outfile, data_slice)
 
-filename = "%s_C_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
-np.savetxt(os.path.join(path, filename), C)
+# filename = "%s_C_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
+# np.savetxt(os.path.join(path, filename), C)
