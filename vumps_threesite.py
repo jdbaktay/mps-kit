@@ -607,7 +607,7 @@ tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si)
        + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
                     + np.kron(np.kron(si, si), sz)))
 
-h = tt2tc
+h = tVV2
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
@@ -658,8 +658,7 @@ while (ep > tol or D < Dmax) and count < 5000:
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-# print('V, V2, g:', V, V2, g)
-print('t2, tc, g:', t, V2, g)
+print('V, V2, g:', V, V2, g)
 
 #AL, C = left_ortho(AR, C, tol/100, stol)
 checks(AL, AR, C)
