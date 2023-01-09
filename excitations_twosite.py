@@ -127,34 +127,23 @@ def right_vector_solver(O, p):
 
     return right_vec.reshape(D, D)
 
-def EffectiveH(AL, AR, Hl, Hr, 
+def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
                VL, h, p, Y):
 
     ### Compute B
-    tensors = [VL.reshape(d, D, D), Y.reshape(D, D)]
-    indices = [(-2, -1, 1), (1, -3)]
-    contord = [1]
-    B = nc.ncon(tensors, indices, contord)
+    B = (VL @ Y.reshape(D, D)).reshape(d, D, D).transpose(1, 0, 2)
 
     ### Compute RB
-    tensors = [B, AR.conj()]
-    indices = [(-1, 1, 2), (1, -2, 2)]
-    contord = [1, 2]
-    t1 = nc.ncon(tensors, indices, contord)
+    t1 = (B.reshape(D, d * D) 
+       @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+       )
 
     RB = right_vector_solver(t1, p)
 
     ### Compute L1
-    tensors = [Hl, B, AL.conj()]
-    indices = [(1, 2), (2, 3, -2), (3, 1, -1)]
-    contord = [1, 2]
-    L1_0 = nc.ncon(tensors, indices, contord)
+    L1_0 = L1_tensors[0] @ B.reshape(D * d, D)
 
-    tensors = [AL, B, h, AL.conj(), AL.conj()]
-    indices = [(3, 6, 7), (7, 4, -2), (1, 2, 3, 4), 
-               (1, 6, 5), (2, 5, -1)]
-    contord = [5, 6, 7, 1, 2, 3, 4]
-    L1_1 = nc.ncon(tensors, indices, contord)
+    L1_1 = L1_tensors[1] @ B.reshape(D * d, D)
 
     tensors = [B, AR, h, AL.conj(), AL.conj()]
     indices = [(7, 3, 5), (4, 5, -3), 
@@ -170,16 +159,9 @@ def EffectiveH(AL, AR, Hl, Hr,
     L1 = left_vector_solver(t2, p)
 
     ### Compute R1
-    tensors = [B, Hr, AR.conj()]
-    indices = [(-1, 3, 1), (1, 2), (3, -2, 2)]
-    contord = [1, 2, 3]
-    R1_0 = nc.ncon(tensors, indices, contord)
+    R1_0 = B.reshape(D, d * D) @ R1_tensors[0]
 
-    tensors = [B, AR, h, AR.conj(), AR.conj()]
-    indices = [(-1, 3, 5), (4, 5, 6), (1, 2, 3, 4), 
-               (1, -2, 7), (2, 7, 6)]
-    contord = [5, 6, 7, 1, 2, 3, 4]
-    R1_1 = nc.ncon(tensors, indices, contord)
+    R1_1 = B.reshape(D, d * D) @ R1_tensors[1]
 
     tensors = [AL, B, h, AR.conj(), AR.conj()]
     indices = [(3, -1, 6), (6, 4, 5), 
@@ -202,10 +184,7 @@ def EffectiveH(AL, AR, Hl, Hr,
     R1 = right_vector_solver(t3, p)
 
     ### Compute Heff
-    tensors = [B, AR, h, AR.conj()]
-    indices = [(-1, 3, 5), (4, 5, 6), (-2, 2, 3, 4), (2, -3, 6)]
-    contord = [5, 6, 2, 3, 4]
-    H_0 = nc.ncon(tensors, indices, contord)
+    H_0 = (B.reshape(D, d * D) @ H_tensors[0]).reshape(D, d, D)
 
     tensors = [B, AR, h, AL.conj()]
     indices = [(5, 3, 6), (4, 6, -3), (1, -2, 3, 4), (1, 5, -1)]
@@ -217,40 +196,21 @@ def EffectiveH(AL, AR, Hl, Hr,
     contord = [5, 6, 2, 3, 4]
     H_2 = nc.ncon(tensors, indices, contord)
 
-    tensors = [AL, B, h, AL.conj()]
-    indices = [(3, 5, 6), (6, 4, -3), (1, -2, 3, 4), (1, 5, -1)]
-    contord = [5, 6, 1, 3, 4]
-    H_3 = nc.ncon(tensors, indices, contord)
+    H_3 = (H_tensors[1] @ B.reshape(D * d, D)).reshape(D, d, D)
 
-    tensors = [B, Hr]
-    indices = [(-1, -2, 1), (1, -3)]
-    contord = [1]
-    H_4 = nc.ncon(tensors, indices, contord)
+    H_4 = (B.reshape(D * d, D) @ Hr).reshape(D, d, D)
 
-    tensors = [Hl, B]
-    indices = [(-1, 1), (1, -2, -3)]
-    contord = [1]
-    H_5 = nc.ncon(tensors, indices, contord)
+    H_5 = (Hl @ B.reshape(D, d * D)).reshape(D, d, D)
 
-    tensors = [L1, AR]
-    indices = [(-1, 1), (-2, 1, -3)]
-    contord = [1]
-    H_6 = nc.ncon(tensors, indices, contord)
+    H_6 = (L1 
+         @ AR.transpose(1, 0, 2).reshape(D, d * D)).reshape(D, d, D)
 
-    tensors = [AL, R1]
-    indices = [(-2, -1, 1), (1, -3)]
-    contord = [1]
-    H_7 = nc.ncon(tensors, indices, contord)
+    H_7 = (AL.transpose(1, 0, 2).reshape(D * d, D) 
+         @ R1).reshape(D, d, D)
 
-    tensors = [Hl, AL, RB]
-    indices = [(-1, 1), (-2, 1, 2), (2, -3)]
-    contord = [1, 2]
-    H_8 = nc.ncon(tensors, indices, contord)
+    H_8 = (H_tensors[2] @ RB).reshape(D, d, D)
 
-    tensors = [AL, AL, RB, h, AL.conj()]
-    indices = [(3, 5, 6), (4, 6, 7), (7, -3), (1, -2, 3, 4), (1, 5, -1,)]
-    contord = [5, 6, 7, 1, 3, 4]
-    H_9 = nc.ncon(tensors, indices, contord)
+    H_9 = (H_tensors[3] @ RB).reshape(D, d, D)
 
     tensors = [AL, AL, h, RB, AR.conj()]
     indices = [(3, -1, 7), (4, 7, 5), (-2, 2, 3, 4), (5, 6), (2, -3, 6)]
@@ -270,21 +230,70 @@ def EffectiveH(AL, AR, Hl, Hr,
        + np.exp(+2j * p) * H_10
        )
 
-    tensors = [H, VL.reshape(d, D, D).conj()]
-    indices = [(2, 1, -2), (1, 2, -1)]
-    contord = [2, 1]
-    Y = nc.ncon(tensors, indices, contord)
+    Y = (VL.conj().transpose(1, 0) 
+       @ H.transpose(1, 0, 2).reshape(d * D, D))
+
     return Y.ravel()
 
 def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
     Hl, Hr = HeffTerms(AL, AR, C, h, Hl, Hr, eta)
+
+    ### Precompute L1 terms
+    tensors = [Hl, AL.conj()]
+    indices = [(1, -2), (-3, 1, -1)]
+    contord = [1]
+    L1_pre_0 = nc.ncon(tensors, indices, contord).reshape(D, D * d)
+
+    tensors = [AL, h, AL.conj(), AL.conj()]
+    indices = [(3, 6, -2), (1, 2, 3, -3), (1, 6, 5), (2, 5, -1)]
+    contord = [5, 6, 1, 2, 3]
+    L1_pre_1 = nc.ncon(tensors, indices, contord).reshape(D, D * d)
+
+    L1_tensors = [L1_pre_0, L1_pre_1]
+
+    ### Precompute R1 terms
+    tensors = [Hr, AR.conj()]
+    indices = [(-2, 1), (-1, -3, 1)]
+    contord = [1]
+    R1_pre_0 = nc.ncon(tensors, indices, contord).reshape(d * D, D)
+
+    tensors = [AR, h, AR.conj(), AR.conj()]
+    indices = [(4, -2, 6), (1, 2, -1, 4), (1, -3, 5), (2, 5, 6)]
+    contord = [5, 6, 1, 2, 4]
+    R1_pre_1 = nc.ncon(tensors, indices, contord).reshape(d * D, D)
+
+    R1_tensors = [R1_pre_0, R1_pre_1]
+
+    ### Precompute H terms
+    tensors = [AR, h, AR.conj()]
+    indices = [(4, -2, 5), (-3, 2, -1, 4), (2, -4, 5)]
+    contord = [5, 2, 4]
+    H_pre_0 = nc.ncon(tensors, indices, contord).reshape(d * D, d * D)
+
+    tensors = [AL, h, AL.conj()]
+    indices = [(3, 5, -3), (1, -2, 3, -4), (1, 5, -1)]
+    contord = [5, 1, 3]
+    H_pre_3 = nc.ncon(tensors, indices, contord).reshape(D * d, D * d)
+
+    tensors = [Hl, AL]
+    indices = [(-1, 1), (-2, 1, -3)]
+    contord = [1]
+    H_pre_8 = nc.ncon(tensors, indices, contord).reshape(D * d, D)
+
+    tensors = [AL, AL, h, AL.conj()]
+    indices = [(3, 5, 6), (4, 6, -3), (1, -2, 3, 4), (1, 5, -1)]
+    contord = [5, 6, 1, 3, 4]
+    H_pre_9 = nc.ncon(tensors, indices, contord).reshape(D * d, D)
+
+    H_tensors = [H_pre_0, H_pre_3, H_pre_8, H_pre_9]
 
     ### Compute nullspace
 
     VL = calc_nullspace(AL.conj().transpose(2, 0, 1).reshape(D, d * D))
 
     ### Solve eigenvalue problem
-    f = functools.partial(EffectiveH, AL, AR, Hl, Hr, VL, h, p)
+    f = functools.partial(EffectiveH, AL, AR, Hl, Hr, 
+                          L1_tensors, R1_tensors, H_tensors, VL, h, p)
 
     H = spspla.LinearOperator((D * D, D * D), matvec=f)
 
@@ -295,6 +304,8 @@ def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
 
 ########################################################################
 energy = []
+energy2 = []
+energy3 = []
 
 D, d = int(sys.argv[2]), 2
 
@@ -323,9 +334,9 @@ tV = (- t / 2 * (np.kron(sx, sx) + np.kron(sy, sy))
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5
 
-# AL = np.loadtxt('XXZ_AL_0.00_016_.txt', dtype=complex).reshape(d, D, D)
-# AR = np.loadtxt('XXZ_AR_0.00_016_.txt', dtype=complex).reshape(d, D, D)
-# C = np.loadtxt('XXZ_C_0.00_016_.txt', dtype=complex)
+AL = np.loadtxt('XXZ_AL_0.00_016_.txt', dtype=complex).reshape(d, D, D)
+AR = np.loadtxt('XXZ_AR_0.00_016_.txt', dtype=complex).reshape(d, D, D)
+C = np.loadtxt('XXZ_C_0.00_016_.txt', dtype=complex)
 
 h = XYZ
 
@@ -354,11 +365,15 @@ for p in mom_dist:
     print()
 
     energy.append(w[0])
+    # energy2.append(w[1])
+    # energy3.append(w[2])
 
 print('w', w.shape)
 print('v', v.shape)
 
 plt.plot(mom_dist, energy)
+# plt.plot(mom_dist, energy2)
+# plt.plot(mom_dist, energy3)
 plt.show()
 
 
