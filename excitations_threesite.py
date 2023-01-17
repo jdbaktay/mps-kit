@@ -126,7 +126,6 @@ def right_vector_solver(O, p):
 
 def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
                VL, h, p, Y):
-
     ### Compute B
     B = (VL @ Y.reshape(D, D)).reshape(d, D, D).transpose(1, 0, 2)
 
@@ -142,17 +141,35 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
 
     L1_1 = L1_tensors[1] @ B.reshape(D * d, D)
 
-    tensors = [AL, B, AR, h, AL.conj(), AL.conj(), AL.conj()]
-    indices = [(4, 7, 8), (8, 5, 10), (6, 10, -2), (1, 2, 3, 4, 5, 6),
-               (1, 7, 9), (2, 9, 11), (3, 11, -1)]
-    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
-    L1_2 = nc.ncon(tensors, indices, contord)
+    ### Compute L1_2
+    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
 
-    tensors = [B, AR, AR, h, AL.conj(), AL.conj(), AL.conj()]
-    indices = [(7, 4, 8), (5, 8, 10), (6, 10, -2), (1, 2, 3, 4, 5, 6), 
-               (1, 7, 9), (2, 9, 11), (3, 11, -1)]
-    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
-    L1_3 = nc.ncon(tensors, indices, contord)
+    t = AL.reshape(D * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
+    t = t.reshape(d * D, d * d * D)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, d * D)
+    t = AL.conj().transpose(2, 0, 1).reshape(D, D * d) @ t
+    t = t.reshape(D * d, D)
+    t = AL.conj().transpose(2, 0, 1).reshape(D, D * d) @ t
+    L1_2 = t
+
+    ### Compute L1_3
+    t = B.reshape(D * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
+    t = t.reshape(d * D, d * d * D)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, d * D)
+    t = AL.conj().transpose(2, 0, 1).reshape(D, D * d) @ t
+    t = t.reshape(D * d, D)
+    t = AL.conj().transpose(2, 0, 1).reshape(D, D * d) @ t
+    L1_3 = t
 
     t2 = (L1_0
     	+ L1_1
@@ -165,29 +182,50 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
     ### Compute R1
     R1_0 = B.reshape(D, d * D) @ R1_tensors[0]
 
-    tensors = [B, AR, AR, h, AR.conj(), AR.conj(), AR.conj()]
-    indices = [(-1, 4, 7), (5, 7, 8), (6, 8, 9), (1, 2, 3, 4, 5, 6), 
-               (1, -2, 11), (2, 11, 10), (3, 10, 9)]
-    contord = [1, 2, 3, 4, 5, 6]
-    R1_1 = nc.ncon(tensors, indices, contord)
+    R1_1 = B.reshape(D, d * D) @ R1_tensors[1]
 
-    tensors = [AL, B, AR, h, AR.conj(), AR.conj(), AR.conj()]
-    indices = [(4, -1, 10), (10, 5, 8), (6, 8, 7), 
-               (1, 2, 3, 4, 5, 6), (1, -2, 11), (2, 11, 9), (3, 9, 7)]
-    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
-    R1_2 = nc.ncon(tensors, indices, contord)
+    ### Compute R1_2
+    t = AL.reshape(D * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(3, 0, 1, 4, 2)
+    t = t.reshape(D * d * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D * d, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    t = t.reshape(D, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    R1_2 = t
 
-    tensors = [AL, AL, B, h, AR.conj(), AR.conj(), AR.conj()]
-    indices = [(4, -1, 10), (5, 10, 8), (8, 6, 7), 
-               (1, 2, 3, 4, 5, 6), (1, -2, 11), (2, 11, 9), (3, 9, 7)]
-    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
-    R1_3 = nc.ncon(tensors, indices, contord)
+    ### Compute R1_3
+    t = AL.reshape(D * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(3, 0, 1, 4, 2)
+    t = t.reshape(D * d * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D * d, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    t = t.reshape(D, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    R1_3 = t
 
-    tensors = [AL, AL, AL, h, AR.conj(), AR.conj(), AR.conj(), RB]
-    indices = [(4, -1, 11), (5, 11, 9), (6, 9, 7), (1, 2, 3, 4, 5, 6), 
-               (1, -2, 12), (2, 12, 10,), (3, 10, 8), (7, 8)]
-    contord = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
-    R1_4 = nc.ncon(tensors, indices, contord)
+    ### Compute R1_4
+    t = AL.reshape(D * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d * d, D) @ RB
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(3, 0, 1, 4, 2)
+    t = t.reshape(D * d * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D * d, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    t = t.reshape(D, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    R1_4 = t
 
     t3 = (R1_0
     	+ R1_1
@@ -200,89 +238,154 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
 
     ### Compute Heff
 
-    tensors = [B, AR, AR, h, AR.conj(), AR.conj()]
-    indices = [(-1, 4, 10), (5, 10, 8), (6, 8, 7), (-2, 2, 3, 4, 5, 6), 
-               (2, -3, 9), (3, 9, 7)]
-    contord = [7, 8, 9, 10, 2, 3, 4, 5, 6]
-    H_0 = nc.ncon(tensors, indices, contord)
+    # H_0
+    H_0 = (B.reshape(D, d * D) @ H_tensors[0]).reshape(D, d, D)
 
-    tensors = [AL, B, AR, h, AR.conj(), AR.conj()]
-    indices = [(4, -1, 10), (10, 5, 8), (6, 8, 7), (-2, 2, 3, 4, 5, 6), 
-               (2, -3, 9), (3, 9, 7)]
-    contord = [7, 8, 9, 10, 2, 3, 4, 5, 6]
-    H_1 = nc.ncon(tensors, indices, contord)
+    # H_1
+    t = AL.reshape(D * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(3, 0, 1, 4, 2)
+    t = t.reshape(D * d * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D * d, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    t = t.reshape(D, d, D)
+    H_1 = t
 
-    tensors = [AL, AL, B, h, AR.conj(), AR.conj()]
-    indices = [(4, -1, 10), (5, 10, 8), (8, 6, 7), (-2, 2, 3, 4, 5, 6),
-               (2, -3, 9), (3, 9, 7)]
-    contord = [7, 8, 9, 10, 2, 3, 4, 5, 6]
-    H_2 = nc.ncon(tensors, indices, contord)
+    # H_2
+    t = AL.reshape(D * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(3, 0, 1, 4, 2)
+    t = t.reshape(D * d * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D * d, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    t = t.reshape(D, d, D)
+    H_2 = t
 
-    tensors = [AL, B, AR, h, AL.conj(), AR.conj()]
-    indices = [(4, 10, 9), (9, 5, 8), (6, 8, 7), (1, -2, 3, 4, 5, 6),
-               (1, 10, -1), (3, -3, 7)]
-    contord = [7, 8, 9, 10, 1, 3, 4, 5, 6]
-    H_3 = nc.ncon(tensors, indices, contord)
+    # H_3
+    t = AL.reshape(D * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 4, 2)
+    t = t.reshape(d * D, d * D * d)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D, d, D)
+    H_3 = t
 
-    tensors = [AL, AL, B, h, AL.conj(), AR.conj()]
-    indices = [(4, 10, 9), (5, 9, 8), (8, 6, 7), (1, -2, 3, 4, 5, 6), 
-               (1, 10, -1), (3, -3, 7)]
-    contord = [7, 8, 9, 10, 1, 3, 4, 5, 6]
-    H_4 = nc.ncon(tensors, indices, contord)
+    # H_4
+    t = AL.reshape(D * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 4, 2)
+    t = t.reshape(d * D, d * D * d)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D, d, D)
+    H_4 = t
 
-    tensors = [B, AR, AR, h, AL.conj(), AR.conj()]
-    indices = [(10, 4, 9), (5, 9, 8), (6, 8, 7), (1, -2, 3, 4, 5, 6),
-               (1, 10, -1), (3, -3, 7)]
-    contord = [7, 8, 9, 10, 1, 3, 4, 5, 6]
-    H_5 = nc.ncon(tensors, indices, contord)
+    # H_5
+    t = B.reshape(D * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 4, 2)
+    t = t.reshape(d * D, d * D * d)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D, d, D)
+    H_5 = t
 
-    tensors = [AL, AL, B, h, AL.conj(), AL.conj()]
-    indices = [(4, 7, 8), (5, 8, 10), (10, 6, -3), (1, 2, -2, 4, 5, 6), 
-               (1, 7, 9), (2, 9, -1)]
-    contord = [7, 8, 9, 10, 1, 2, 4, 5, 6]
-    H_6 = nc.ncon(tensors, indices, contord)
+    # H_6
+    H_6 = (H_tensors[1] @ B.reshape(D * d, D)).reshape(D, d, D)
 
-    tensors = [AL, B, AR, h, AL.conj(), AL.conj()]
-    indices = [(4, 7, 8), (8, 5, 10), (6, 10, -3), (1, 2, -2, 4, 5, 6), 
-               (1, 7, 9), (2, 9, -1)]
-    contord = [7, 8, 9, 10, 1, 2, 4, 5, 6]
-    H_7 = nc.ncon(tensors, indices, contord)
+    # H_7
+    t = AL.reshape(D * d, D) @ B.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
+    t = t.reshape(d * D, d * d * D)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, d * D)
+    t = AL.conj().transpose(2, 0, 1).reshape(D, D * d) @ t
+    t = t.reshape(D, d, D)
+    H_7 = t
 
-    tensors = [B, AR, AR, h, AL.conj(), AL.conj()]
-    indices = [(7, 4, 8), (5, 8, 10), (6, 10, -3), (1, 2, -2, 4, 5, 6), 
-               (1, 7, 9), (2, 9, -1)]
-    contord = [7, 8, 9, 10, 1, 2, 4, 5, 6]
-    H_8 = nc.ncon(tensors, indices, contord)
+    # H_8
+    t = B.reshape(D * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AR.reshape(D, d * D)
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
+    t = t.reshape(d * D, d * d * D)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, d * D)
+    t = AL.conj().transpose(2, 0, 1).reshape(D, D * d) @ t
+    t = t.reshape(D, d, D)
+    H_8 = t 
 
+    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
+
+    # H_9
     H_9 = (B.reshape(D * d, D) @ Hr).reshape(D, d, D)
 
+    # H_10
     H_10 = (Hl @ B.reshape(D, d * D)).reshape(D, d, D)
 
+    # H_11
     H_11 = (L1 
          @ AR.transpose(1, 0, 2).reshape(D, d * D)).reshape(D, d, D)
 
+    # H_12
     H_12 = (AL.transpose(1, 0, 2).reshape(D * d, D) 
          @ R1).reshape(D, d, D)
 
-    H_13 = (H_tensors[0] @ RB).reshape(D, d, D)
+    # H_13
+    H_13 = (H_tensors[2] @ RB).reshape(D, d, D)
 
-    tensors = [AL, AL, AL, RB, h, AL.conj(), AL.conj()]
-    indices = [(4, 8, 9), (5, 9, 10), (6, 10, 11), (11, -3), 
-               (1, 2, -2, 4, 5, 6), (1, 8, 7), (2, 7, -1)]
-    contord = [7, 8, 9, 10, 11, 1, 2, 4, 5, 6]
-    H_14 = nc.ncon(tensors, indices, contord)
+    # H_14
+    H_14  = (H_tensors[3] @ RB).reshape(D, d, D)
 
-    tensors = [AL, AL, AL, h, AL.conj(), AR.conj(), RB]
-    indices = [(4, 7, 8), (5, 8, 9), (6, 9, 10), (1, -2, 3, 4, 5, 6),
-               (1, 7, -1), (3, -3, 11), (10, 11)]
-    contord = [7, 8, 9, 10, 11, 1, 3, 4, 5, 6]
-    H_15 = nc.ncon(tensors, indices, contord)
+    # H_15
+    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
 
-    tensors = [AL, AL, AL, h, AR.conj(), AR.conj(), RB]
-    indices = [(4, -1, 7), (5, 7, 8), (6, 8, 9), (-2, 2, 3, 4, 5, 6), 
-               (2, -3, 11), (3, 11, 10), (9, 10)]
-    contord = [7, 8, 9, 10, 11, 2, 3, 4, 5, 6]
-    H_16 = nc.ncon(tensors, indices, contord)
+    t = AL.reshape(D * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d * d, D) @ RB
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 4, 2)
+    t = t.reshape(d * D, d * D * d)
+    t = AL.conj().transpose(2, 1, 0).reshape(D, d * D) @ t
+    t = t.reshape(D * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D, d, D)
+    H_15 = t
+
+    # H_16
+    t = AL.reshape(D * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d, D) @ AL.reshape(D, d * D)
+    t = t.reshape(D * d * d * d, D) @ RB
+    t = t.reshape(D, d, d, d, D).transpose(1, 2, 3, 0, 4)
+    t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+    t = t.reshape(d, d, d, D, D).transpose(3, 0, 1, 4, 2)
+    t = t.reshape(D * d * d, D * d)
+    t = t @ AR.conj().transpose(2, 1, 0).reshape(D * d, D)
+    t = t.reshape(D * d, d * D)
+    t = t @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
+    t = t.reshape(D, d, D)
+    H_16 = t
 
     H = (H_0
        + np.exp(+1j * p) * H_1
@@ -330,15 +433,39 @@ def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
     contord = [1]
     R1_pre_0 = nc.ncon(tensors, indices, contord).reshape(d * D, D)
 
-    R1_tensors = [R1_pre_0]
+    tensors = [AR, AR, h, AR.conj(), AR.conj(), AR.conj()]
+    indices = [(5, -2, 8), (6, 8, 9), (1, 2, 3, -1, 5, 6), 
+               (1, -3, 11), (2, 11, 10), (3, 10, 9)]
+    contord = [8, 9, 10, 11, 1, 2, 3, 5, 6]
+    R1_pre_1 = nc.ncon(tensors, indices, contord).reshape(d * D, D)
+
+    R1_tensors = [R1_pre_0, R1_pre_1]
 
     ### Precompute H terms
+    tensors = [AR, AR, h, AR.conj(), AR.conj()]
+    indices = [(5, -2, 8), (6, 8, 7), (-3, 2, 3, -1, 5, 6), 
+               (2, -4, 9), (3, 9, 7)]
+    contord = [7, 8, 9, 2, 3, 5, 6]
+    H_pre_0 = nc.ncon(tensors, indices, contord).reshape(d * D, d * D)
+
+    tensors = [AL, AL, h, AL.conj(), AL.conj()]
+    indices = [(4, 7, 8), (5, 8, -3), (1, 2, -2, 4, 5, -4), 
+               (1, 7, 9), (2, 9, -1)]
+    contord = [7, 8, 9, 1, 2, 4, 5]
+    H_pre_6 = nc.ncon(tensors, indices, contord).reshape(D * d, D * d)
+
     tensors = [Hl, AL]
     indices = [(-1, 1), (-2, 1, -3)]
     contord = [1]
     H_pre_8 = nc.ncon(tensors, indices, contord).reshape(D * d, D)
 
-    H_tensors = [H_pre_8]
+    tensors = [AL, AL, AL, h, AL.conj(), AL.conj()]
+    indices = [(4, 8, 9), (5, 9, 10), (6, 10, -3), (1, 2, -2, 4, 5, 6),
+               (1, 8, 7), (2, 7, -1)]
+    contord = [7, 8, 9, 10, 1, 2, 4, 5, 6]
+    H_pre_14 = nc.ncon(tensors, indices, contord).reshape(D * d, D)
+
+    H_tensors = [H_pre_0, H_pre_6, H_pre_8, H_pre_14]
 
     ### Compute nullspace
 
