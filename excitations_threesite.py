@@ -7,6 +7,7 @@ import scipy.sparse.linalg as spspla
 import matplotlib.pyplot as plt
 import functools
 import canon_forms
+import hamiltonians
 import sys
 
 def calc_nullspace(n):
@@ -356,7 +357,7 @@ def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
 
 energy = []
 
-D, d = int(sys.argv[4]), 2
+D, d = int(sys.argv[2]), 2
 
 stol, tol = 1e-12, 1e-12
 
@@ -369,38 +370,12 @@ sp = 0.5 * (sx + 1.0j * sy)
 sm = 0.5 * (sx - 1.0j * sy)
 n = 0.5 * (sz + np.eye(d))
 
-x, y, z = 1, 1, float(sys.argv[1])
-XYZ = ((- x / 8) * (np.kron(np.kron(sx, sx), si) + np.kron(si, np.kron(sx, sx)))
-     + (- y / 8) * (np.kron(np.kron(sy, sy), si) + np.kron(si, np.kron(sy, sy)))
-     + (+ z / 8) * (np.kron(np.kron(sz, sz), si) + np.kron(si, np.kron(sz, sz)))
-     ) 
-
-t, V, V2, g = 1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-tVV2 = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
-                  + np.kron(np.kron(sy, sy), si)
-                  )
-
-      + (-t / 4) * (np.kron(si, np.kron(sx, sx)) 
-                  + np.kron(si, np.kron(sy, sy))
-                  )
-
-      + (V / 8) * np.kron(np.kron(sz, sz), si)
-      + (V / 8) * np.kron(si, np.kron(sz, sz))
-      + (V2 / 4) * np.kron(np.kron(sz, si), sz)
-      + (g / 6) * (np.kron(sz, np.kron(si, si)) 
-                 + np.kron(np.kron(si, sz), si)
-                 + np.kron(np.kron(si, si), sz)
-                 )
-      )
-
-A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
-C = np.random.rand(D, D) - 0.5
-
 AL = np.loadtxt('XXZ_AL_0.00_016_.txt', dtype=complex).reshape(d, D, D)
 AR = np.loadtxt('XXZ_AR_0.00_016_.txt', dtype=complex).reshape(d, D, D)
 C = np.loadtxt('XXZ_C_0.00_016_.txt', dtype=complex)
 
-h = XYZ
+x, y, z = float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+h = hamiltonians.XYZ_half(x, y, z, size='three')
 
 tensors = [AL, C, AR, AR, h.reshape(d, d, d, d, d, d), 
            AL.conj(), C.conj(), AR.conj(), AR.conj()]
@@ -408,15 +383,15 @@ indices = [(4, 11, 12), (12, 13), (5, 13, 14), (6, 14, 7),
            (1, 2, 3, 4, 5, 6), 
            (1, 11, 10), (10, 9), (2, 9, 8), (3, 8, 7)]
 contord = [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4, 5, 6]
-e = nc.ncon(tensors, indices, contord)
-print('gs energy', e)
+gs_energy = nc.ncon(tensors, indices, contord)
+print('gs energy', gs_energy)
 
-h = h - e * np.eye(d**3)
+h = h - gs_energy * np.eye(d**3)
 h = h.reshape(d, d, d, d, d, d)
 
-Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
+Hl, Hr = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
-mps = AL, AR, C #= canon_forms.checks(A, C, tol=tol, stol=stol)
+mps = AL, AR, C
 canon_forms.checks(*mps)
 
 mom_dist = np.linspace(-np.pi, np.pi, 51)
