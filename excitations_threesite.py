@@ -140,11 +140,7 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
     ### Compute L1
     L1_0 = L1_tensors[0] @ B.reshape(D * d, D)
 
-    tensors = [AL, AL, B, h, AL.conj(), AL.conj(), AL.conj()]
-    indices = [(4, 9, 10), (5, 10, 11), (11, 6, -2), (1, 2, 3, 4, 5, 6), 
-               (1, 9, 8), (2, 8, 7), (3, 7, -1)]
-    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
-    L1_1 = nc.ncon(tensors, indices, contord)
+    L1_1 = L1_tensors[1] @ B.reshape(D * d, D)
 
     tensors = [AL, B, AR, h, AL.conj(), AL.conj(), AL.conj()]
     indices = [(4, 7, 8), (8, 5, 10), (6, 10, -2), (1, 2, 3, 4, 5, 6),
@@ -320,7 +316,13 @@ def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
     contord = [1]
     L1_pre_0 = nc.ncon(tensors, indices, contord).reshape(D, D * d)
 
-    L1_tensors = [L1_pre_0]
+    tensors = [AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
+    indices = [(4, 9, 10), (5, 10, -2), (1, 2, 3, 4, 5, -3), 
+               (1, 9, 8), (2, 8, 7), (3, 7, -1)]
+    contord = [7, 8, 9, 10, 1, 2, 3, 4, 5]
+    L1_pre_1 = nc.ncon(tensors, indices, contord).reshape(D, D * d)
+
+    L1_tensors = [L1_pre_0, L1_pre_1]
 
     ### Precompute R1 terms
     tensors = [Hr, AR.conj()]
@@ -357,7 +359,7 @@ def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
 
 energy = []
 
-D, d = int(sys.argv[2]), 2
+D, d = int(sys.argv[4]), 2
 
 stol, tol = 1e-12, 1e-12
 
