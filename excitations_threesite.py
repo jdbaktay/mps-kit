@@ -134,14 +134,16 @@ def h_ket(X, Y, Z):
 
 def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
                VL, h, p, Y):
+    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
+
     ### Compute B
     B = (VL @ Y.reshape(D, D)).reshape(d, D, D).transpose(1, 0, 2)
 
     ### Compute RB
     t1 = (B.reshape(D, d * D) 
-       @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+       @ AR.conj().transpose(1, 2, 0).reshape(d * D, D)
        )
-
+    
     RB = right_vector_solver(t1, p)
 
     ### Compute L1
@@ -149,8 +151,6 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
     L1_1 = L1_tensors[1] @ B.reshape(D * d, D)
 
     ### Compute L1_2
-    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
-
     AL_B_AR = h_ket(AL, B, AR)
     t = AL_B_AR.transpose(0, 3, 1, 2, 4)
     t = t.reshape(d * D, d * d * D)
