@@ -146,7 +146,6 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
 
     ### Compute L1
     L1_0 = L1_tensors[0] @ B.reshape(D * d, D)
-
     L1_1 = L1_tensors[1] @ B.reshape(D * d, D)
 
     ### Compute L1_2
@@ -183,7 +182,6 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
 
     ### Compute R1
     R1_0 = B.reshape(D, d * D) @ R1_tensors[0]
-
     R1_1 = B.reshape(D, d * D) @ R1_tensors[1]
 
     ### Compute R1_2
@@ -299,31 +297,15 @@ def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
     t = t.reshape(D, d, D)
     H_8 = t 
 
-    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
-
-    # H_9
+    # H_9 - H14
     H_9 = (B.reshape(D * d, D) @ Hr).reshape(D, d, D)
-
-    # H_10
     H_10 = (Hl @ B.reshape(D, d * D)).reshape(D, d, D)
-
-    # H_11
-    H_11 = (L1 
-         @ AR.transpose(1, 0, 2).reshape(D, d * D)).reshape(D, d, D)
-
-    # H_12
-    H_12 = (AL.transpose(1, 0, 2).reshape(D * d, D) 
-         @ R1).reshape(D, d, D)
-
-    # H_13
+    H_11 = (L1 @ AR.reshape(D, d * D)).reshape(D, d, D)
+    H_12 = (AL.reshape(D * d, D) @ R1).reshape(D, d, D)
     H_13 = (H_tensors[2] @ RB).reshape(D, d, D)
-
-    # H_14
     H_14  = (H_tensors[3] @ RB).reshape(D, d, D)
 
     # H_15
-    AL, AR = AL.transpose(1, 0, 2), AR.transpose(1, 0, 2)
-
     t = AL_AL_AL.reshape(d * d * d * D, D) @ RB
     t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 4, 2)
     t = t.reshape(d * D, d * D * d)
