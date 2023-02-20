@@ -1,380 +1,451 @@
-#Excitations
+# Single-particle excitations
 
-import ncon as nc
 import numpy as np
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
 import matplotlib.pyplot as plt
+import ncon as nc
 import functools
-import canon_forms
 import sys
+
+# My scripts
+import hamiltonians
+from mps_tools import checks, HeffTerms
+
+def Heff(AL, AR, C, Lh, Rh, LR_block_inv, RL_block_inv, h, p, Y):
+    Y = Y.reshape(D * (d - 1), D)
+
+    tensors = [VL, Y]
+    indices = [(-1, -2, 1), (1, -3)]
+    contord = [1]
+    B = nc.ncon(tensors, indices, contord)
+
+    # print('left gauge check 1', 
+    #       spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
+    #       )
+
+    # print('left gauge check 2', 
+    #       spla.norm(nc.ncon([AL, B.conj()], [(1, 2, -2), (1, 2, -1)]))
+    #       )
+
+    # print('perp to gs.', 
+    #       nc.ncon([B, C.conj(), AR.conj()], [(2, 1, 4), (2, 3), (3, 1, 4)])
+    #       )
+
+    ################# 12 diagrams ######################################
+    tensors = [np.eye(D), AR, h, AR.conj()]
+    indices = [(-1, -4), (-6, 4, 6), (-2, 2, -5, 4), (-3, 2, 6)]
+    H_1 = nc.ncon(tensors, indices).reshape(D * d * D, D * d * D)
+
+    tensors = [AR, h, AL.conj()]
+    indices = [(-6, 4, -3), (1, -2, -5, 4), (-4, 1, -1)]
+    H_2 = nc.ncon(tensors, indices).reshape(D * d * D, D * d * D)
+
+    tensors = [AL, h, AR.conj()]
+    indices = [(-1, 3, -4), (-2, 2, 3, -5), (-3, 2, -6)]
+    H_3 = nc.ncon(tensors, indices).reshape(D * d * D, D * d * D)
+
+    tensors = [AL, np.eye(D), h, AL.conj()]
+    indices = [(5, 3, -4), (-6, -3), (1, -2, 3, -5), (5, 1, -1)]
+    H_4 = nc.ncon(tensors, indices).reshape(D * d * D, D * d * D)
+
+    tensors = [np.eye(D), np.eye(d), Rh]
+    indices = [(-1, -4), (-2, -5), (-6, -3)]
+    H_5 = nc.ncon(tensors, indices).reshape(D * d * D, D * d * D)
+
+    tensors = [Lh, np.eye(d), np.eye(D)]
+    indices = [(-1, -4), (-2, -5), (-6, -3)]
+    H_6 = nc.ncon(tensors, indices).reshape(D * d * D, D * d * D)
+
+    tensors = [Lh, AL.conj(), RL_block_inv, AR]
+    indices = [(6, -4), (6, -5, 5), (-6, 5, 7, -1), (7, -2, -3)]
+    contord = [6, 5, 7]
+    H_7 = nc.ncon(tensors, indices, contord).reshape(D * d * D, D * d * D)
+
+    tensors = [AL, h, AL.conj(), AL.conj(),
+               RL_block_inv, AR]
+    indices = [(7, 3, -4), (1, 2, 3, -5), (7, 1, 6), (6, 2, 5),
+               (-6, 5, 8, -1), (8, -2, -3)]
+    contord = [7, 6, 5, 8, 1, 2, 3]
+    H_8 = nc.ncon(tensors, indices, contord).reshape(D * d * D, D * d * D)
+
+    tensors = [AR, h, AL.conj(), AL.conj(),
+               RL_block_inv, AR]
+    indices = [(-6, 4, 7), (1, 2, -5, 4), (-4, 1, 6), (6, 2, 5),
+               (7, 5, 8, -1), (8, -2, -3)]
+    contord = [6, 5, 7, 8, 1, 2, 4]
+    H_9 = nc.ncon(tensors, indices, contord).reshape(D * d * D, D * d * D)
+
+    tensors = [Lh, AL, LR_block_inv, AR.conj()]
+    indices = [(-1, 5), (5, -2, 6), (6, -3, -4, 7), (7, -5, -6)]
+    contord = [5, 6, 7]
+    H_10 = nc.ncon(tensors, indices, contord).reshape(D * d * D, D * d * D)
+
+    tensors = [AL, AL, h, AL.conj(),
+               LR_block_inv, AR.conj()]
+    indices = [(5, 3, 6), (6, 4, 7), (1, -2, 3, 4), (5, 1, -1),
+               (7, -3, -4, 8), (8, -5, -6)]
+    contord = [5, 6, 7, 8, 1, 3, 4]
+    H_11 = nc.ncon(tensors, indices, contord).reshape(D * d * D, D * d * D)
+
+    tensors = [AL, AL, h, AR.conj(), 
+               LR_block_inv, AR.conj()]
+    indices = [(-1, 3, 5), (5, 4, 6), (-2, 2, 3, 4), (-3, 2, 7),
+               (6, 7, -4, 8), (8, -5, -6)]
+    contord = [5, 6, 7, 8, 2, 3 ,4]
+    H_12 = nc.ncon(tensors, indices, contord).reshape(D * d * D, D * d * D)
+    ####################################################################
+
+    H = (H_1 
+       + np.exp(-1.0j * p) * H_2
+       + np.exp(+1.0j * p) * H_3
+       + H_4
+       + H_5
+       + H_6
+       + np.exp(-1.0j * p) * H_7
+       + np.exp(-1.0j * p) * H_8
+       + np.exp(-2.0j * p) * H_9
+       + np.exp(+1.0j * p) * H_10
+       + np.exp(+1.0j * p) * H_11
+       + np.exp(+2.0j * p) * H_12
+       )
+
+    if p == 0:
+        print('H == H+', spla.norm(H - H.conj().T))
+
+    HB = H @ B.ravel()
+    HB = HB.reshape(D, d, D)
+
+    tensors = [HB, VL.conj()]
+    indices = [(2, 1, -2), (2, 1, -1)]
+    contord = [2, 1]
+    Y = nc.ncon(tensors, indices, contord)
+    return Y.ravel()
+
+def quasi_particle(AL, AR, C, Lh, Rh, h, p, N):
+    LR_block = (np.eye(D**2).reshape(D, D, D, D) 
+                 - np.exp(+1.0j * p) * E_LR
+                 )
+
+    LR_block_inv = spla.inv(LR_block.reshape(D**2, D**2))
+    LR_block_inv = LR_block_inv.reshape(D, D, D, D)
+
+    RL_block = (np.eye(D**2).reshape(D, D, D, D) 
+                - np.exp(-1.0j * p) * E_RL
+                )
+
+    RL_block_inv = spla.inv(RL_block.reshape(D**2, D**2))
+    RL_block_inv = RL_block_inv.reshape(D, D, D, D) 
+
+    f = functools.partial(Heff, AL, AR, C, Lh, Rh,
+                          LR_block_inv, RL_block_inv, h, p)
+    H = spspla.LinearOperator((D**2 * (d - 1), D**2 * (d - 1)), matvec=f)
+
+    w, v = spspla.eigsh(H, k=N, which='SR', tol=tol)
+    # print('norm check', 
+    #       np.trace(v.reshape(D, D).conj().T @ v.reshape(D, D))
+    #       )
+    return w, v
 
 def calc_nullspace(n):
     u, s, vh = spla.svd(n, full_matrices=True)
-    nullspace = vh.conj().T[:, D:]
-    return nullspace
+    print('null check', vh.conj().T[:, :D * (d - 1)].shape)
+    return vh.conj().T[:, D * (d - 1):]
 
-def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
-    tensors = [AL, AL, h, AL.conj(), AL.conj()]
-    indices = [(2, 7, 1), (3, 1, -2), (4, 5, 2, 3), (4, 7, 6), (5, 6, -1)]
-    contord = [7, 2, 4, 1, 3, 6, 5]
-    hl = nc.ncon(tensors, indices, contord)
-    el = np.trace(hl @ C @ C.T.conj())
+def gs_energy(AL, AR, C, h):
+    tensors = [AL, C, AR, h.reshape(d, d, d, d), 
+               AL.conj(), C.conj(), AR.conj()]
+    indices = [(5, 3, 6),  (6, 7),  (7, 4, 8), (1, 2, 3, 4), 
+               (5, 1, 10), (10, 9), (9, 2, 8)]
+    contord = [5, 6, 7, 8, 9, 10, 1, 2, 3, 4] 
+    return nc.ncon(tensors, indices, contord)
 
-    tensors = [AR, AR, h, AR.conj(), AR.conj()]
-    indices = [(2, -1, 1), (3, 1, 7), (4, 5, 2, 3), (4, -2, 6), (5, 6, 7)]
-    contord = [7, 3, 5, 1, 2, 6, 4]
-    hr = nc.ncon(tensors, indices, contord)
-    er = np.trace(C.T.conj() @ C @ hr)
+def dynamical_correlations(AL, AR, C, excited_energy, excited_states, 
+                           mom_dist, freq_dist, gamma, O, i):
+    corr_fxn = []
 
-    e = 0.5 * (el + er)
+    AC = np.tensordot(C, AR, axes=(1, 0))
+    print('AC', AC.shape)
 
-    hl -= el * np.eye(D)
-    hr -= er * np.eye(D)
-    # print('hl == hl+', spla.norm(hl - hl.T.conj()))
-    # print('hr == hr+', spla.norm(hr - hr.T.conj()))
-
-    hl = 0.5 * (hl + hl.T.conj())
-    hr = 0.5 * (hr + hr.T.conj())
-
-    Hl -= np.trace(Hl @ C @ C.T.conj()) * np.eye(D)
-    Hr -= np.trace(C.T.conj() @ C @ Hr) * np.eye(D)
-
-    def left_env(X):
-        X = X.reshape(D, D)
-
-        t = X @ AL.transpose(1, 0, 2).reshape(D, d * D)
-        XT = (AL.conj().transpose(2, 1, 0).reshape(D, D * d) 
-              @ t.reshape(D * d, D))
-
-        XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
-        return (X - XT + XR).ravel()
-
-    def right_env(X):
-        X = X.reshape(D, D)
-
-        t = AR.reshape(d * D, D) @ X
-        t = t.reshape(d, D, D).transpose(1, 2, 0).reshape(D, D * d)
-        XT = t @ AR.conj().transpose(2, 0, 1).reshape(D * d, D)
-
-        XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
-        return (X - XT + XL).ravel()
-
-    Ol = spspla.LinearOperator((D**2, D**2), matvec=left_env)
-    Or = spspla.LinearOperator((D**2, D**2), matvec=right_env)
-
-    Hl, _ = spspla.gmres(Ol, hl.ravel(), 
-                         x0=Hl.ravel(), tol=ep/100, atol=ep/100
-                         )
-
-    Hr, _ = spspla.gmres(Or, hr.ravel(), 
-                         x0=Hr.ravel(), tol=ep/100, atol=ep/100
-                         )
-
-    Hl, Hr = Hl.reshape(D, D), Hr.reshape(D, D)
-    # print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
-    # print('Hr == Hr+', spla.norm(Hr - Hr.T.conj()))
-
-    Hl = 0.5 * (Hl + Hl.T.conj())
-    Hr = 0.5 * (Hr + Hr.T.conj())
-
-    # print('(L|hr)', np.trace(C.T.conj() @ C @ hr))
-    # print('(hl|R)', np.trace(hl @ C @ C.T.conj()))
-
-    # print('(L|Hr)', np.trace(C.T.conj() @ C @ Hr))
-    # print('(Hl|R)', np.trace(Hl @ C @ C.T.conj()))
-    return Hl, Hr
-
-def left_vector_solver(O, p):
     def left_env(X):
         X = X.reshape(D, D)
 
         t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
-        XT = (AL.conj().transpose(2, 1, 0).reshape(D, D * d) 
+        XT = (AR.conj().transpose(2, 1, 0).reshape(D, D * d) 
                @ t.reshape(D * d, D))
 
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
-    left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
-
-    rand_init = np.random.rand(D, D) - 0.5
-    left_vec, _ = spspla.gmres(left_env_op, O.ravel(), 
-                               x0=rand_init.ravel(), 
-                               tol=10**-12, 
-                               atol=10**-12
-                               )
-
-    return left_vec.reshape(D, D)
-
-def right_vector_solver(O, p):
     def right_env(X):
         X = X.reshape(D, D)
 
         t = AL.reshape(d * D, D) @ X
         t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
-        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+        XT = t @ AL.conj().transpose(0, 2, 1).reshape(d * D, D)
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
-    right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
+    for omega in freq_dist:
+
+        s = 0
+        for j in range(excited_states.shape[2]):
+
+            B = np.tensordot(VL, excited_states[i,j], axes=(2, 0))
+            print(B.shape)
+
+            tensors = [B, AC.conj()]
+            indices = [(1, 2, -2), (1, 2, -1)]
+            contord = [1, 2]
+            left_vec = nc.ncon(tensors, indices, contord)
+
+            tensors = [B, AC.conj()]
+            indices = [(-1, 2, 1), (-2, 2, 1)]
+            contord = [1, 2]
+            right_vec = nc.ncon(tensors, indices, contord)
+
+            rand_init = np.random.rand(D, D) - 0.5
+
+            left_env_op = spspla.LinearOperator((D * D, D * D), 
+                                                matvec=left_env
+                                                )
+
+            LB = spspla.gmres(left_env_op, left_vec.ravel(), 
+                                       x0=rand_init.ravel(), 
+                                       tol=tol, 
+                                       atol=tol
+                                       )[0].reshape(D, D)
+
+            right_env_op = spspla.LinearOperator((D * D, D * D), 
+                                                 matvec=right_env
+                                                 )
+
+            RB = spspla.gmres(right_env_op, right_vec.ravel(), 
+                                        x0=rand_init.ravel(), 
+                                        tol=tol, 
+                                        atol=tol
+                                        )[0].reshape(D, D)
+
+            tensors = [B, O, AC.conj()]
+            indices = [(3, 2, 4), (1, 2), (3, 1, 4)]
+            contord = [3, 4, 1, 2]
+            w1 = nc.ncon(tensors, indices, contord)
+
+            tensors = [AL, O, AL.conj(), RB]
+            indices = [(3, 2, 4), (1, 2), (3, 1, 5), (4, 5)]
+            contord = [4, 5, 3, 1, 2]
+            w2 = nc.ncon(tensors, indices, contord)
+
+            tensors = [LB, AR, O, AR.conj()]
+            indices = [(4, 5), (5, 2, 3), (1, 2), (4, 1, 3)]
+            contord = [3, 4, 5, 1, 2]
+            w3 = nc.ncon(tensors, indices, contord)
+
+            spectral_weight = np.abs(w1 
+                                   + np.exp(+1j * p) * w2 
+                                   + np.exp(-1j * p) * w3
+                                   )
+
+            s += (2 * np.pi
+                    * lorentzian(omega, excited_energy[i,j], gamma)
+                    * spectral_weight**2 # is this right
+                    )
+
+        corr_fxn.append(s)
+    return np.array(corr_fxn)
+
+def lorentzian(x, x0, gamma):
+    return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
 
 
-    rand_init = np.random.rand(D, D) - 0.5
-    right_vec, _ = spspla.gmres(right_env_op, O.ravel(), 
-                                x0=rand_init.ravel(), 
-                                tol=10**-12, 
-                                atol=10**-12
-                                )
+########################### Initialization #############################
+excit_energy, excit_states = [], []
 
-    return right_vec.reshape(D, D)
+tol = 1e-12
 
-def EffectiveH(AL, AR, Hl, Hr, L1_tensors, R1_tensors, H_tensors,
-               VL, h, p, Y):
+model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 
-    ### Compute B
-    B = (VL @ Y.reshape(D, D)).reshape(d, D, D).transpose(1, 0, 2)
+x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
 
-    ### Compute RB
-    t1 = (B.reshape(D, d * D) 
-       @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
-       )
+params = (model, z, D)
 
-    RB = right_vector_solver(t1, p)
+AL = np.loadtxt('%s_AL_%.2f_%03i_.txt' % params, dtype=complex)
+AL = AL.reshape(d, D, D).transpose(1, 0, 2)
 
-    ### Compute L1
-    L1_0 = L1_tensors[0] @ B.reshape(D * d, D)
+AR = np.loadtxt('%s_AR_%.2f_%03i_.txt' % params, dtype=complex)
+AR = AR.reshape(d, D, D).transpose(1, 0, 2)
 
-    L1_1 = L1_tensors[1] @ B.reshape(D * d, D)
+C = np.loadtxt('%s_C_%.2f_%03i_.txt' % params, dtype=complex)
+C = C.reshape(D, D)
 
-    tensors = [B, AR, h, AL.conj(), AL.conj()]
-    indices = [(7, 3, 5), (4, 5, -3), 
-               (1, 2, 3, 4), (1, 7, 6), (2, 6, -1)]
-    contord = [7, 5, 6, 1, 2, 4]
-    L1_2 = nc.ncon(tensors, indices, contord)
+Lh = np.loadtxt('%s_Lh_%.2f_%03i_.txt' % params, dtype=complex)
+Lh = Lh.reshape(D, D)
 
-    t2 = (L1_0
-        + L1_1
-        + np.exp(-1j * p) * L1_2
-        )
+Rh = np.loadtxt('%s_Rh_%.2f_%03i_.txt' % params, dtype=complex)
+Rh = Rh.reshape(D, D)
 
-    L1 = left_vector_solver(t2, p)
+if model == 'halfXXZ':
+    h = hamiltonians.XYZ_half(x, y, z, size='two')
 
-    ### Compute R1
-    R1_0 = B.reshape(D, d * D) @ R1_tensors[0]
+if model == 'TFI':
+    h = hamiltonians.TFI(y, z)
 
-    R1_1 = B.reshape(D, d * D) @ R1_tensors[1]
+if model == 'oneXXZ':
+    h = hamiltonians.XYZ_one(x, y, z, size='two')
 
-    tensors = [AL, B, h, AR.conj(), AR.conj()]
-    indices = [(3, -1, 6), (6, 4, 5), 
-               (1, 2, 3, 4), (1, -2, 7), (2, 7, 5)]
-    contord = [5, 6, 7, 1, 2, 3, 4]
-    R1_2 = nc.ncon(tensors, indices, contord)
+checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
+print('gse', gs_energy(AL, AR, C, h))
 
-    tensors = [AL, AL, h, RB, AR.conj(), AR.conj()]
-    indices = [(3, -1, 7), (4, 7, 5), 
-               (1, 2, 3, 4), (5, 6), (1, -2, 8), (2, 8, 6)]
-    contord = [5, 6, 7, 8, 1, 2, 3, 4]
-    R1_3 = nc.ncon(tensors, indices, contord)
+######################### Pre-compute steps ############################
+h -= np.real(gs_energy(AL, AR, C, h)) * np.eye(d**2)  # Regularize hamiltonian
+h = h.reshape(d, d, d, d) 
+print('reg. gse', gs_energy(AL, AR, C, h))
 
-    t3 = (R1_0
-        + R1_1
-        + np.exp(+1j * p) * R1_2
-        + np.exp(+2j * p) * R1_3
-        )
-        
-    R1 = right_vector_solver(t3, p)
+VL = spla.null_space(AL.conj().reshape(D * d, D).T)
+VL = VL.reshape(D, d, D * (d - 1))
 
-    ### Compute Heff
-    H_0 = (B.reshape(D, d * D) @ H_tensors[0]).reshape(D, d, D)
-
-    tensors = [B, AR, h, AL.conj()]
-    indices = [(5, 3, 6), (4, 6, -3), (1, -2, 3, 4), (1, 5, -1)]
-    contord = [5, 6, 1, 3, 4]
-    H_1 = nc.ncon(tensors, indices, contord)
-
-    tensors = [AL, B, h, AR.conj()]
-    indices = [(3, -1, 6), (6, 4, 5), (-2, 2, 3, 4), (2, -3, 5)]
-    contord = [5, 6, 2, 3, 4]
-    H_2 = nc.ncon(tensors, indices, contord)
-
-    H_3 = (H_tensors[1] @ B.reshape(D * d, D)).reshape(D, d, D)
-
-    H_4 = (B.reshape(D * d, D) @ Hr).reshape(D, d, D)
-
-    H_5 = (Hl @ B.reshape(D, d * D)).reshape(D, d, D)
-
-    H_6 = (L1 
-         @ AR.transpose(1, 0, 2).reshape(D, d * D)).reshape(D, d, D)
-
-    H_7 = (AL.transpose(1, 0, 2).reshape(D * d, D) 
-         @ R1).reshape(D, d, D)
-
-    H_8 = (H_tensors[2] @ RB).reshape(D, d, D)
-
-    H_9 = (H_tensors[3] @ RB).reshape(D, d, D)
-
-    tensors = [AL, AL, h, RB, AR.conj()]
-    indices = [(3, -1, 7), (4, 7, 5), (-2, 2, 3, 4), (5, 6), (2, -3, 6)]
-    contord = [5, 6, 7, 2, 3, 4]
-    H_10 = nc.ncon(tensors, indices, contord)
-
-    H = (H_0
-       + np.exp(-1j * p) * H_1
-       + np.exp(+1j * p) * H_2
-       + H_3
-       + H_4
-       + H_5
-       + np.exp(-1j * p) * H_6
-       + np.exp(+1j * p) * H_7
-       + np.exp(+1j * p) * H_8
-       + np.exp(+1j * p) * H_9
-       + np.exp(+2j * p) * H_10
-       )
-
-    Y = (VL.conj().transpose(1, 0) 
-       @ H.transpose(1, 0, 2).reshape(d * D, D))
-
-    return Y.ravel()
-
-def quasiparticle(AL, AR, C, Hl, Hr, h, p, N, eta):
-    Hl, Hr = HeffTerms(AL, AR, C, h, Hl, Hr, eta)
-
-    ### Precompute L1 terms
-    tensors = [Hl, AL.conj()]
-    indices = [(1, -2), (-3, 1, -1)]
-    contord = [1]
-    L1_pre_0 = nc.ncon(tensors, indices, contord).reshape(D, D * d)
-
-    tensors = [AL, h, AL.conj(), AL.conj()]
-    indices = [(3, 6, -2), (1, 2, 3, -3), (1, 6, 5), (2, 5, -1)]
-    contord = [5, 6, 1, 2, 3]
-    L1_pre_1 = nc.ncon(tensors, indices, contord).reshape(D, D * d)
-
-    L1_tensors = [L1_pre_0, L1_pre_1]
-
-    ### Precompute R1 terms
-    tensors = [Hr, AR.conj()]
-    indices = [(-2, 1), (-1, -3, 1)]
-    contord = [1]
-    R1_pre_0 = nc.ncon(tensors, indices, contord).reshape(d * D, D)
-
-    tensors = [AR, h, AR.conj(), AR.conj()]
-    indices = [(4, -2, 6), (1, 2, -1, 4), (1, -3, 5), (2, 5, 6)]
-    contord = [5, 6, 1, 2, 4]
-    R1_pre_1 = nc.ncon(tensors, indices, contord).reshape(d * D, D)
-
-    R1_tensors = [R1_pre_0, R1_pre_1]
-
-    ### Precompute H terms
-    tensors = [AR, h, AR.conj()]
-    indices = [(4, -2, 5), (-3, 2, -1, 4), (2, -4, 5)]
-    contord = [5, 2, 4]
-    H_pre_0 = nc.ncon(tensors, indices, contord).reshape(d * D, d * D)
-
-    tensors = [AL, h, AL.conj()]
-    indices = [(3, 5, -3), (1, -2, 3, -4), (1, 5, -1)]
-    contord = [5, 1, 3]
-    H_pre_3 = nc.ncon(tensors, indices, contord).reshape(D * d, D * d)
-
-    tensors = [Hl, AL]
-    indices = [(-1, 1), (-2, 1, -3)]
-    contord = [1]
-    H_pre_8 = nc.ncon(tensors, indices, contord).reshape(D * d, D)
-
-    tensors = [AL, AL, h, AL.conj()]
-    indices = [(3, 5, 6), (4, 6, -3), (1, -2, 3, 4), (1, 5, -1)]
-    contord = [5, 6, 1, 3, 4]
-    H_pre_9 = nc.ncon(tensors, indices, contord).reshape(D * d, D)
-
-    H_tensors = [H_pre_0, H_pre_3, H_pre_8, H_pre_9]
-
-    ### Compute nullspace
-
-    VL = calc_nullspace(AL.conj().transpose(2, 0, 1).reshape(D, d * D))
-
-    ### Solve eigenvalue problem
-    f = functools.partial(EffectiveH, AL, AR, Hl, Hr, 
-                          L1_tensors, R1_tensors, H_tensors, VL, h, p)
-
-    H = spspla.LinearOperator((D * D, D * D), matvec=f)
-
-    rand_init = np.random.rand(D, D) - 0.5
-    w, v = spspla.eigsh(H, k=N, which='SR', 
-                           v0=rand_init.ravel(), tol=eta)
-    return w, v
-
-########################################################################
-energy = []
-energy2 = []
-energy3 = []
-
-D, d = int(sys.argv[2]), 2
-
-stol, tol = 1e-12, 1e-12
-
-si = np.array([[1, 0],[0, 1]])
-sx = np.array([[0, 1],[1, 0]])
-sy = np.array([[0, -1j],[1j, 0]])
-sz = np.array([[1, 0],[0, -1]])
-
-sp = 0.5 * (sx + 1.0j*sy)
-sm = 0.5 * (sx - 1.0j*sy)
-n = 0.5 * (sz + np.eye(d))
-
-x, y, z = 1, 1, float(sys.argv[1])
-XYZ = (- x / 4 * np.kron(sx, sx) 
-       - y / 4 * np.kron(sy, sy)
-       + z / 4 * np.kron(sz, sz) 
+print('null check 1', 
+      spla.norm(nc.ncon([VL, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
       )
 
-t, V = 1, float(sys.argv[1])
-tV = (- t / 2 * (np.kron(sx, sx) + np.kron(sy, sy)) 
-      + V / 4 * np.kron(sz, sz)
+print('null check 2',
+    spla.norm(nc.ncon([VL, VL.conj()], [(1, 2, -2), (1, 2, -1)])
+               - np.eye(D * (d - 1)))
+    )
+
+tensors = [AL, AR.conj()]
+indices = [(-1, 1, -3), (-2, 1, -4)]
+E_LR = nc.ncon(tensors, indices)
+
+tensors = [AR, AL.conj()]
+indices = [(-1, 1, -3), (-2, 1, -4)]
+E_RL = nc.ncon(tensors, indices)
+
+def left_fixed_point(A, B):
+    def left_transfer_op(X):
+        tensors = [A, X.reshape(D, D), B.conj()]
+        indices = [(2, 1, -2), (3, 2), (3, 1, -1)]
+        contord = [2, 3, 1]
+        return nc.ncon(tensors,indices,contord).ravel()
+
+    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
+    evals, evecs = spspla.eigs(E, k=1, which="LR", tol=1e-14)
+    return evecs[:,0].reshape(D, D)
+
+def right_fixed_point(A, B):
+    def right_transfer_op(X):
+        tensors = [A, X.reshape(D, D), B.conj()]
+        indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
+        contord = [2, 3, 1]
+        return nc.ncon(tensors,indices,contord).ravel()
+
+    E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
+    evals, evecs = spspla.eigs(E, k=1, which="LR", tol=1e-14)
+    return evecs[:,0].reshape(D, D)
+
+lfp_LR = left_fixed_point(AL, AR)
+rfp_LR = right_fixed_point(AL, AR)
+
+lfp_LR /= np.trace(lfp_LR @ rfp_LR)
+rfp_LR /= np.trace(lfp_LR @ rfp_LR)
+
+lfp_RL = left_fixed_point(AR, AL)
+rfp_RL = right_fixed_point(AR, AL)
+
+lfp_RL /= np.trace(lfp_RL @ rfp_RL)
+rfp_RL /= np.trace(lfp_RL @ rfp_RL)
+
+print('ELR: left fix point check',
+      spla.norm(lfp_LR - nc.ncon([lfp_LR, E_LR], [(2, 1), (1, 2, -2, -1)]))
       )
 
-A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
-C = np.random.rand(D, D) - 0.5
+print('ELR: right fix point check',
+      spla.norm(rfp_LR - nc.ncon([E_LR, rfp_LR], [(-1, -2, 1, 2), (1, 2)]))
+      )
 
-AL = np.loadtxt('XXZ_AL_0.00_016_.txt', dtype=complex).reshape(d, D, D)
-AR = np.loadtxt('XXZ_AR_0.00_016_.txt', dtype=complex).reshape(d, D, D)
-C = np.loadtxt('XXZ_C_0.00_016_.txt', dtype=complex)
+print('ELR (l|r)', np.trace(lfp_LR @ rfp_LR))
 
-h = XYZ
+print('ERL: left fix point check',
+      spla.norm(lfp_RL - nc.ncon([lfp_RL, E_RL], [(2, 1), (1, 2, -2, -1)]))
+      )
 
-e = nc.ncon([AL, C, AR, h.reshape(d, d, d, d), 
-             AL.conj(), C.conj(), AR.conj()],
-            [(3, 5, 6), (6, 7), (4, 7, 8), (1, 2, 3, 4), 
-             (1, 5, 10), (10, 9), (2, 9, 8)],
-            [5, 6, 7, 8, 9, 10, 1, 2, 3, 4]
-            )
-print('gs energy', e)
+print('ERL: right fix point check',
+      spla.norm(rfp_RL - nc.ncon([E_RL, rfp_RL], [(-1, -2, 1, 2), (1, 2)]))
+      )
 
-h = h - e * np.eye(d**2)
-h = h.reshape(d, d, d, d)
+print('ERL (l|r)', np.trace(lfp_RL @ rfp_RL))
 
-Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
+tensors = [rfp_LR, lfp_LR]
+indices = [(-1, -2), (-4, -3)]
+P_LR = nc.ncon(tensors, indices)
 
-mps = AL, AR, C #= canon_forms.mix_gauge(A, C, tol=tol, stol=stol)
-canon_forms.checks(*mps)
+E_LR -= P_LR
 
-mom_dist = np.linspace(-np.pi, np.pi, 51)
+tensors = [rfp_RL, lfp_RL]
+indices = [(-1, -2), (-4, -3)]
+P_RL = nc.ncon(tensors, indices)
 
-for p in mom_dist:
-    print('mom', p)
-    w, v = quasiparticle(AL, AR, C, Hl, Hr, h, p=p, N=1, eta=tol)
-    print('excit. energy', w[0])
-    print()
+E_RL -= P_RL
+######################### Compute excitations ##########################
 
-    energy.append(w[0])
-    # energy2.append(w[1])
-    # energy3.append(w[2])
+mom_vec = np.linspace(0, np.pi, 21)
 
-print('w', w.shape)
-print('v', v.shape)
+for p in mom_vec:
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=1)
 
-plt.plot(mom_dist, energy)
-# plt.plot(mom_dist, energy2)
-# plt.plot(mom_dist, energy3)
+    excit_energy.append(w)
+    excit_states.append(v)
+    print('excit. energy', w[0]) # 0.410479248463
+
+
+excit_energy = np.array(excit_energy)
+print('all excit. energy', excit_energy.shape)
+print('energy min', excit_energy.min())
+print('energy max', excit_energy.max())
+
+excit_states = np.array(excit_states)
+print('all excit. states', excit_states.shape)
+
+plt.plot(mom_vec, excit_energy)
+plt.title('s=1/2, %s, z=%.2f, D=%i ' % params)
 plt.show()
+
+exit()
+
+gamma = 0.05
+freq_dist = np.linspace(excit_energy.min() - 0.25,
+                        excit_energy.max() + 0.25, 
+                        150)
+
+for i in range(mom_dist.shape[0]):
+    print('mom', mom_dist[i])
+    spectral_fxn.append(
+        dynamical_correlations(AL, AR, C, 
+                               excit_energy, excit_states, 
+                               mom_dist, freq_dist, 
+                               gamma, sz, i
+                               )
+        )
+
+# plt.plot(mom_vec, np.abs(np.cos(mom_vec - np.pi / 2)), label ='exact')
+
+# plt.ylabel('\u03C9 / 0.410479248463')  
+
+# plt.plot(mom_vec, 
+#          2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
+#          label='exact'
+#          )
+
+# plt.plot(mom_vec, np.pi / 2 * np.abs(np.sin(mom_vec)), label='exact') 
+
+
+
+
+
+
+
+
+
+
+
 
 
 
