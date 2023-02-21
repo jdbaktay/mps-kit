@@ -12,27 +12,28 @@ import sys
 import hamiltonians
 from mps_tools import checks, HeffTerms
 
-def left_fixed_point(A, B):
+def fixed_points(A, B):
     def left_transfer_op(X):
         tensors = [A, X.reshape(D, D), B.conj()]
         indices = [(2, 1, -2), (3, 2), (3, 1, -1)]
         contord = [2, 3, 1]
         return nc.ncon(tensors,indices,contord).ravel()
 
-    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-    evals, evecs = spspla.eigs(E, k=1, which="LR", tol=1e-14)
-    return evecs[:,0].reshape(D, D)
-
-def right_fixed_point(A, B):
     def right_transfer_op(X):
         tensors = [A, X.reshape(D, D), B.conj()]
         indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
         contord = [2, 3, 1]
         return nc.ncon(tensors,indices,contord).ravel()
 
+    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
+    lfp_AB = spspla.eigs(E, k=1, which="LR", tol=1e-14)[1].reshape(D, D)
+
     E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
-    evals, evecs = spspla.eigs(E, k=1, which="LR", tol=1e-14)
-    return evecs[:,0].reshape(D, D)
+    rfp_AB = spspla.eigs(E, k=1, which="LR", tol=1e-14)[1].reshape(D, D)
+
+    lfp_AB /= np.trace(lfp_AB @ rfp_AB)
+    rfp_AB /= np.trace(lfp_AB @ rfp_AB)
+    return lfp_AB, rfp_AB
 
 def left_vector_solver(O, p):
     def left_env(X):
@@ -121,7 +122,6 @@ def Heff(AL, AR, C, Lh, Rh, h, p, Y):
 
     L1 = L1_1 + L1_2 + (L1_3 * np.exp(-1.0j * p))
     L1 = left_vector_solver(L1, p)
-    # print('t')
 
     tensors = [B, AR, h, AR.conj()]
     indices = [(-1, 3, 5), (5, 4, 6), (-2, 2, 3, 4), (-3, 2, 6)]
@@ -202,11 +202,6 @@ def quasi_particle(AL, AR, C, Lh, Rh, h, p, N):
     #              )
     #       )
     return w, v
-
-def calc_nullspace(n):
-    u, s, vh = spla.svd(n, full_matrices=True)
-    print('null check', vh.conj().T[:, :D * (d - 1)].shape)
-    return vh.conj().T[:, D * (d - 1):]
 
 def gs_energy(AL, AR, C, h):
     tensors = [AL, C, AR, h.reshape(d, d, d, d), 
@@ -308,7 +303,6 @@ def dynamical_correlations(AL, AR, AC, excit_energy, excit_states,
 def lorentzian(x, x0, gamma):
     return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
 
-
 ########################### Initialization #############################
 excit_energy, excit_states, spectral_fxn = [], [], []
 
@@ -380,17 +374,8 @@ print('null check 2',
                - np.eye(D * (d - 1)))
     )
 
-lfp_LR = left_fixed_point(AL, AR)
-rfp_LR = right_fixed_point(AL, AR)
-
-lfp_LR /= np.trace(lfp_LR @ rfp_LR)
-rfp_LR /= np.trace(lfp_LR @ rfp_LR)
-
-lfp_RL = left_fixed_point(AR, AL)
-rfp_RL = right_fixed_point(AR, AL)
-
-lfp_RL /= np.trace(lfp_RL @ rfp_RL)
-rfp_RL /= np.trace(lfp_RL @ rfp_RL)
+lfp_LR, rfp_LR = fixed_points(AL, AR)
+lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
 mom_vec = np.linspace(0, np.pi, 21)
@@ -418,14 +403,14 @@ plt.plot(mom_vec, excit_energy, label ='approx')
 
 # plt.plot(mom_vec, np.abs(np.cos(mom_vec - np.pi / 2)), label ='exact')
 
-# plt.plot(mom_vec, 
-#          2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
-#          label='exact'
-#          )
+plt.plot(mom_vec, 
+         2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
+         label='exact'
+         )
 
 # plt.plot(mom_vec, np.pi / 2 * np.abs(np.sin(mom_vec)), label='exact')
 
-plt.grid()
+# plt.grid()
 plt.legend()
 plt.show()
 
@@ -474,10 +459,10 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 #            np.column_stack((mom_dist, excited_energy)), 
 #            )
 
-filename = "%s_dsf_%.2f_%03i_.dat" % params 
-np.savetxt(filename, 
-           np.column_stack((freq_dist, spectral_fxn)), 
-           )
+# filename = "%s_dsf_%.2f_%03i_.dat" % params 
+# np.savetxt(filename, 
+#            np.column_stack((freq_dist, spectral_fxn)), 
+#            )
 
 
 
