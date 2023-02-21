@@ -44,7 +44,7 @@ def left_vector_solver(O, p):
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
 
-        XR = np.trace(X @ rfp_LR) * lfp_LR
+        XR = np.trace(X @ rfp_RL) * lfp_RL
         return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
 
     left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
@@ -396,17 +396,17 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-plt.title('s=1, %s, z=%.2f, D=%i ' % params)
+plt.title('s=1/2, %s, h=%.2f, D=%i ' % params)
 # plt.ylabel('\u03C9 / 0.410479248463')
 
 plt.plot(mom_vec, excit_energy, label ='approx')
 
 # plt.plot(mom_vec, np.abs(np.cos(mom_vec - np.pi / 2)), label ='exact')
 
-plt.plot(mom_vec, 
-         2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
-         label='exact'
-         )
+# plt.plot(mom_vec, 
+#          2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
+#          label='exact'
+#          )
 
 # plt.plot(mom_vec, np.pi / 2 * np.abs(np.sin(mom_vec)), label='exact')
 
