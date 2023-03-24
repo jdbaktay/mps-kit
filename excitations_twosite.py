@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import ncon as nc
 import functools
 import sys
+import os
 
 # My scripts
 import hamiltonians
-from mps_tools import checks, HeffTerms
+from mps_tools import checks, HeffTerms_two
 
 def fixed_points(A, B):
     def left_transfer_op(X):
@@ -26,13 +27,15 @@ def fixed_points(A, B):
         return nc.ncon(tensors,indices,contord).ravel()
 
     E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-    lfp_AB = spspla.eigs(E, k=1, which="LR", tol=1e-14)[1].reshape(D, D)
+    lfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
 
     E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
-    rfp_AB = spspla.eigs(E, k=1, which="LR", tol=1e-14)[1].reshape(D, D)
+    rfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
 
-    lfp_AB /= np.trace(lfp_AB @ rfp_AB)
-    rfp_AB /= np.trace(lfp_AB @ rfp_AB)
+    norm = np.trace(lfp_AB @ rfp_AB)
+
+    lfp_AB /= np.sqrt(norm)
+    rfp_AB /= np.sqrt(norm)
     return lfp_AB, rfp_AB
 
 def left_vector_solver(O, p):
@@ -44,8 +47,12 @@ def left_vector_solver(O, p):
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
 
-        XR = np.trace(X @ rfp_RL) * lfp_RL
-        return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
+        if p == 0:
+            XR = np.trace(X @ rfp_RL) * lfp_RL
+
+            return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
+        else:
+            return (X - np.exp(-1.0j * p) * XT).ravel() 
 
     left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
 
@@ -66,8 +73,12 @@ def right_vector_solver(O, p):
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
 
-        XL = np.trace(lfp_LR @ X) * rfp_LR
-        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
+        if p == 0:
+            XL = np.trace(lfp_LR @ X) * rfp_LR
+
+            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
+        else:
+            return (X - np.exp(+1.0j * p) * XT).ravel()
 
     right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -196,11 +207,6 @@ def quasi_particle(AL, AR, C, Lh, Rh, h, p, N):
     H = spspla.LinearOperator((D**2 * (d - 1), D**2 * (d - 1)), matvec=f)
 
     w, v = spspla.eigsh(H, k=N, which='SR', tol=tol)
-    # print('norm check', 
-    #       np.trace(v.reshape(D * (d - 1), D).conj().T 
-    #              @ v.reshape(D * (d - 1), D)
-    #              )
-    #       )
     return w, v
 
 def gs_energy(AL, AR, C, h):
@@ -211,100 +217,9 @@ def gs_energy(AL, AR, C, h):
     contord = [5, 6, 7, 8, 9, 10, 1, 2, 3, 4] 
     return nc.ncon(tensors, indices, contord)
 
-def dynamical_correlations(AL, AR, AC, excit_energy, excit_states, 
-                           mom_dist, freq_dist, gamma, O, i):
-    corr_fxn = []
-
-    def left_env(X):
-        X = X.reshape(D, D)
-
-        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
-        XT = (AR.conj().transpose(2, 1, 0).reshape(D, D * d) 
-               @ t.reshape(D * d, D))
-
-        return (X - np.exp(-1.0j * p) * XT).ravel()
-
-    def right_env(X):
-        X = X.reshape(D, D)
-
-        t = AL.reshape(d * D, D) @ X
-        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
-        XT = t @ AL.conj().transpose(0, 2, 1).reshape(d * D, D)
-        return (X - np.exp(+1.0j * p) * XT).ravel()
-
-    for omega in freq_dist:
-
-        s = 0
-        for j in range(excit_states.shape[2]):
-
-            X = excit_states[i,:,j].reshape(D * (d - 1), D)
-            B = np.tensordot(VL, X, axes=(2, 0))
-
-            tensors = [B, AC.conj()]
-            indices = [(1, 2, -2), (1, 2, -1)]
-            contord = [1, 2]
-            left_vec = nc.ncon(tensors, indices, contord)
-
-            tensors = [B, AC.conj()]
-            indices = [(-1, 2, 1), (-2, 2, 1)]
-            contord = [1, 2]
-            right_vec = nc.ncon(tensors, indices, contord)
-
-            rand_init = np.random.rand(D, D) - 0.5
-
-            left_env_op = spspla.LinearOperator((D * D, D * D), 
-                                                matvec=left_env
-                                                )
-
-            LB = spspla.gmres(left_env_op, left_vec.ravel(), 
-                                       x0=rand_init.ravel(), 
-                                       tol=tol, 
-                                       atol=tol
-                                       )[0].reshape(D, D)
-
-            right_env_op = spspla.LinearOperator((D * D, D * D), 
-                                                 matvec=right_env
-                                                 )
-
-            RB = spspla.gmres(right_env_op, right_vec.ravel(), 
-                                        x0=rand_init.ravel(), 
-                                        tol=tol, 
-                                        atol=tol
-                                        )[0].reshape(D, D)
-
-            tensors = [B, O, AC.conj()]
-            indices = [(3, 2, 4), (1, 2), (3, 1, 4)]
-            contord = [3, 4, 1, 2]
-            w1 = nc.ncon(tensors, indices, contord)
-
-            tensors = [AL, O, AL.conj(), RB]
-            indices = [(3, 2, 4), (1, 2), (3, 1, 5), (4, 5)]
-            contord = [4, 5, 3, 1, 2]
-            w2 = nc.ncon(tensors, indices, contord)
-
-            tensors = [LB, AR, O, AR.conj()]
-            indices = [(4, 5), (5, 2, 3), (1, 2), (4, 1, 3)]
-            contord = [3, 4, 5, 1, 2]
-            w3 = nc.ncon(tensors, indices, contord)
-
-            spectral_weight = np.abs(w1 
-                                   + np.exp(+1j * p) * w2 
-                                   + np.exp(-1j * p) * w3
-                                   )
-
-            s += (2 * np.pi
-                    * lorentzian(omega, excit_energy[i,j], gamma)
-                    * spectral_weight**2 # is this right
-                    )
-
-        corr_fxn.append(s)
-    return np.array(corr_fxn)
-
-def lorentzian(x, x0, gamma):
-    return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
 
 ########################### Initialization #############################
-excit_energy, excit_states, spectral_fxn = [], [], []
+excit_energy, excit_states = [], []
 
 tol = 1e-12
 
@@ -314,29 +229,33 @@ x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
 
 params = (model, z, D)
 
-AL = np.loadtxt('%s_AL_%.2f_%03i_.txt' % params, dtype=complex)
+path = '/Users/joshuabaktay/Desktop/local data/states'
+
+filename = '%s_AL_%.2f_%03i_.txt' % params
+AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AL = AL.reshape(d, D, D).transpose(1, 0, 2)
 
-AR = np.loadtxt('%s_AR_%.2f_%03i_.txt' % params, dtype=complex)
+filename = '%s_AR_%.2f_%03i_.txt' % params
+AR = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AR = AR.reshape(d, D, D).transpose(1, 0, 2)
 
-C = np.loadtxt('%s_C_%.2f_%03i_.txt' % params, dtype=complex)
+filename = '%s_C_%.2f_%03i_.txt' % params
+C = np.loadtxt(os.path.join(path, filename), dtype=complex)
 C = C.reshape(D, D)
 
-Lh = np.loadtxt('%s_Lh_%.2f_%03i_.txt' % params, dtype=complex)
-Lh = Lh.reshape(D, D)
-
-Rh = np.loadtxt('%s_Rh_%.2f_%03i_.txt' % params, dtype=complex)
-Rh = Rh.reshape(D, D)
+Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
 if model == 'halfXXZ':
     h = hamiltonians.XYZ_half(x, y, z, size='two')
 
 if model == 'TFI':
-    h = hamiltonians.TFI(y, z)
+    h = hamiltonians.TFI(y, z, size='two')
 
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
+
+if model == 'tV':
+    h = hamiltonians.tV(x, y, z)
 
 if d == 2:
     si = np.array([[1, 0],[0, 1]])
@@ -358,6 +277,8 @@ checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
 
 ######################### Pre-compute steps ############################
+Lh, Rh, _ = HeffTerms_two(AL, AR, C, Lh, Rh, h, tol)
+
 h -= np.real(gs_energy(AL, AR, C, h)) * np.eye(d**2)  # Regularize hamiltonian
 h = h.reshape(d, d, d, d) 
 print('reg. gse', gs_energy(AL, AR, C, h))
@@ -374,18 +295,22 @@ print('null check 2',
                - np.eye(D * (d - 1)))
     )
 
-lfp_LR, rfp_LR = fixed_points(AL, AR)
+lfp_LR, rfp_LR = fixed_points(AL, AR)    
 lfp_RL, rfp_RL = fixed_points(AR, AL)
+
+P_LR = nc.ncon([rfp_LR, lfp_LR], [(-1, -2), (-4, -3)]).reshape(D**2, D**2)
+print('P^2 - P', spla.norm((P_LR @ P_LR) - P_LR))
 
 ######################### Compute excitations ##########################
 mom_vec = np.linspace(0, np.pi, 21)
 
+num = int(sys.argv[7])
 for p in mom_vec:
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=1)
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
 
     excit_energy.append(w)
     excit_states.append(v)
-    print('excit. energy', w[0]) # 0.410479248463
+    print('excit. energy', w[0])
 
 
 excit_energy = np.array(excit_energy)
@@ -396,73 +321,17 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-plt.title('s=1/2, %s, h=%.2f, D=%i ' % params)
-# plt.ylabel('\u03C9 / 0.410479248463')
+filename = '%s_dispfull_%.2f_%03i_%03i_.dat' % (*params, num)
+np.savetxt(filename,
+           np.column_stack((mom_vec, excit_energy))
+           )
 
-plt.plot(mom_vec, excit_energy, label ='approx')
+filename = '%s_estatefull_%.2f_%03i_%03i_.dat' % (*params, num)
+with open(filename, 'a') as outfile:
+    for data_slice in excit_states:
+        np.savetxt(outfile, data_slice)
 
-# plt.plot(mom_vec, np.abs(np.cos(mom_vec - np.pi / 2)), label ='exact')
 
-# plt.plot(mom_vec, 
-#          2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
-#          label='exact'
-#          )
-
-# plt.plot(mom_vec, np.pi / 2 * np.abs(np.sin(mom_vec)), label='exact')
-
-# plt.grid()
-plt.legend()
-plt.show()
-
-exit()
-
-gamma = 0.05
-freq_dist = np.linspace(excit_energy.min() - 0.25,
-                        excit_energy.max() + 0.25, 
-                        150)
-
-for i in range(mom_vec.shape[0]):
-    print('mom', mom_vec[i])
-    spectral_fxn.append(
-        dynamical_correlations(AL, AR, np.tensordot(C, AR, axes=(1, 0)), 
-                               excit_energy, excit_states, 
-                               mom_vec, freq_dist, 
-                               gamma, sz, i
-                               )
-        )
-
-spectral_fxn = np.array(spectral_fxn).T
-print('spectral_fxn', spectral_fxn.shape)
-
-fig, ax = plt.subplots()
-
-A, B = np.meshgrid(mom_vec, freq_dist)
-
-ax.plot(A, B, 'o', markersize=0.75, color='black')
-
-levels = 10
-plot = ax.contourf(A, B, spectral_fxn, levels)
-
-ticks = np.linspace(spectral_fxn.min(), spectral_fxn.max(), levels)
-cbar = fig.colorbar(plot, ticks=ticks, format='%.3f')
-cbar.ax.set_ylabel('S(q, \u03C9)')
-
-ax.set_xlabel('q')
-ax.set_ylabel('\u03C9')
-
-plt.show()
-
-path = '/Users/joshuabaktay/Desktop/code/vumps'
-
-# filename = "%s_disp_%.2f_%.2f_%03i_.dat" % params
-# np.savetxt(filename, 
-#            np.column_stack((mom_dist, excited_energy)), 
-#            )
-
-# filename = "%s_dsf_%.2f_%03i_.dat" % params 
-# np.savetxt(filename, 
-#            np.column_stack((freq_dist, spectral_fxn)), 
-#            )
 
 
 
