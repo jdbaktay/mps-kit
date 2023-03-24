@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import ncon as nc
 import functools
 import sys
+import os
 
 # My scripts
 import hamiltonians
-from mps_tools import checks, HeffTerms
+from mps_tools import checks, HeffTerms_three
 
 def fixed_points(A, B):
     def left_transfer_op(X):
@@ -26,13 +27,15 @@ def fixed_points(A, B):
         return nc.ncon(tensors,indices,contord).ravel()
 
     E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-    lfp_AB = spspla.eigs(E, k=1, which="LR", tol=1e-14)[1].reshape(D, D)
+    lfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
 
     E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
-    rfp_AB = spspla.eigs(E, k=1, which="LR", tol=1e-14)[1].reshape(D, D)
+    rfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
 
-    lfp_AB /= np.trace(lfp_AB @ rfp_AB)
-    rfp_AB /= np.trace(lfp_AB @ rfp_AB)
+    norm = np.trace(lfp_AB @ rfp_AB)
+
+    lfp_AB /= np.sqrt(norm)
+    rfp_AB /= np.sqrt(norm)
     return lfp_AB, rfp_AB
 
 def left_vector_solver(O, p):
@@ -44,8 +47,12 @@ def left_vector_solver(O, p):
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
 
-        XR = np.trace(X @ rfp_RL) * lfp_RL
-        return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
+        if p == 0:
+            XR = np.trace(X @ rfp_RL) * lfp_RL
+
+            return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
+        else:
+            return (X - np.exp(-1.0j * p) * XT).ravel()
 
     left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
 
@@ -66,8 +73,12 @@ def right_vector_solver(O, p):
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
 
-        XL = np.trace(lfp_LR @ X) * rfp_LR
-        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
+        if p == 0:
+            XL = np.trace(lfp_LR @ X) * rfp_LR
+
+            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
+        else:
+            return (X - np.exp(+1.0j * p) * XT).ravel()
 
     right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -278,8 +289,21 @@ def gs_energy(AL, AR, C, h):
     contord = [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4, 5, 6] 
     return nc.ncon(tensors, indices, contord)
 
+def calc_expectations(AL, AR, C, O):
+    AC = np.tensordot(AL, C, axes=(2, 0))
+
+    if O.shape[0] == d:
+        tensors = [AC, O, AC.conj()]
+        indices = [(1, 3, 4), (2, 3), (1, 2, 4)]
+        contord = [1, 4, 3, 2]
+        expectation_value = nc.ncon(tensors, indices, contord)
+
+    if O.shape[0] == d**2:
+        pass
+    return expectation_value
+
 ########################### Initialization #############################
-excit_energy, excit_states, spectral_fxn = [], [], []
+excit_energy, excit_states = [], []
 
 tol = 1e-12
 
@@ -287,22 +311,23 @@ model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
 
-params = (model, z, D)
+params = (model, x, y, z, D)
 
-AL = np.loadtxt('%s_AL_%.2f_%03i_.txt' % params, dtype=complex)
+path = '/Users/joshuabaktay/Desktop/local data/states'
+
+filename = '%s_AL_%.2f_%.2f_%.2f_%03i_.txt' % params
+AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AL = AL.reshape(d, D, D).transpose(1, 0, 2)
 
-AR = np.loadtxt('%s_AR_%.2f_%03i_.txt' % params, dtype=complex)
+filename = '%s_AR_%.2f_%.2f_%.2f_%03i_.txt' % params
+AR = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AR = AR.reshape(d, D, D).transpose(1, 0, 2)
 
-C = np.loadtxt('%s_C_%.2f_%03i_.txt' % params, dtype=complex)
+filename = '%s_C_%.2f_%.2f_%.2f_%03i_.txt' % params
+C = np.loadtxt(os.path.join(path, filename), dtype=complex)
 C = C.reshape(D, D)
 
-Lh = np.loadtxt('%s_Lh_%.2f_%03i_.txt' % params, dtype=complex)
-Lh = Lh.reshape(D, D)
-
-Rh = np.loadtxt('%s_Rh_%.2f_%03i_.txt' % params, dtype=complex)
-Rh = Rh.reshape(D, D)
+Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
 if model == 'halfXXZ':
     h = hamiltonians.XYZ_half(x, y, z, size='three')
@@ -312,6 +337,9 @@ if model == 'TFI':
 
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='three')
+
+if model =='tVV2':
+    h = hamiltonians.tVV2(1, x, y, z)
 
 if d == 2:
     si = np.array([[1, 0],[0, 1]])
@@ -333,6 +361,8 @@ checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
 
 ######################### Pre-compute steps ############################
+Lh, Rh, _ = HeffTerms_three(AL, AR, C, Lh, Rh, h, tol)
+
 h -= np.real(gs_energy(AL, AR, C, h)) * np.eye(d**3)  # Regularize hamiltonian
 h = h.reshape(d, d, d, d, d, d) 
 print('reg. gse', gs_energy(AL, AR, C, h))
@@ -355,12 +385,19 @@ lfp_RL, rfp_RL = fixed_points(AR, AL)
 ######################### Compute excitations ##########################
 mom_vec = np.linspace(0, np.pi, 21)
 
+density = calc_expectations(AL, AR, C, n)
+print('density', density)
+
+# q = 0.1
+# mom_vec = np.array([density - q, density, density + q]) * np.pi
+
+num = int(sys.argv[7])
 for p in mom_vec:
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=1)
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
 
     excit_energy.append(w)
     excit_states.append(v)
-    print('excit. energy', w[0]) # 0.410479248463
+    print('excit. energy', w[0]) 
 
 
 excit_energy = np.array(excit_energy)
@@ -371,23 +408,17 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-plt.title('s=1/2, %s, h=%.2f, D=%i ' % params)
-# plt.ylabel('\u03C9 / 0.410479248463')
+filename = '%s_disp_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, num)
+np.savetxt(filename,
+           np.column_stack((mom_vec, excit_energy))
+           )
 
-plt.plot(mom_vec, excit_energy, label ='approx')
+filename = '%s_estate_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, num)
+with open(filename, 'a') as outfile:
+    for data_slice in excit_states:
+        np.savetxt(outfile, data_slice)
 
-# plt.plot(mom_vec, np.abs(np.cos(mom_vec - np.pi / 2)), label ='exact')
 
-plt.plot(mom_vec, 
-         2 * np.sqrt(z**2 + y**2 - 2 * z * y * np.cos(mom_vec)), 
-         label='exact'
-         )
-
-# plt.plot(mom_vec, np.pi / 2 * np.abs(np.sin(mom_vec)), label='exact')
-
-# plt.grid()
-plt.legend()
-plt.show()
 
 
 
