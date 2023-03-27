@@ -344,8 +344,14 @@ def calc_scf(AL, AR, C, o1, o2, o3, mom_vec):
 
     lfp = calc_lfp(AL, AL, o3)
 
+    print('<o1>', calc_expectation_val(o1, AC, lfp))
+    print('<o2>', calc_expectation_val(o2, AC, lfp))
+
     o1 = o1 - calc_expectation_val(o1, AC, lfp) * np.eye(d)
     o2 = o2 - calc_expectation_val(o2, AC, lfp) * np.eye(d)
+
+    print('<o1>', calc_expectation_val(o1, AC, lfp))
+    print('<o2>', calc_expectation_val(o2, AC, lfp))
 
     def left_env(X):
         X = X.reshape(D, D)
@@ -576,18 +582,35 @@ print('density', density)
 # plt.yscale('log')
 # plt.show()
 
-# exit()
+N = int(np.floor(correlation_length))
+print('N for scf', N)
 
-# plt.plot(-1 * np.log(spla.svdvals(C)**2), 'x', label='entanglement spec.')
+qs = np.linspace(0, 1, N) * np.pi
+ssf = calc_scf(AL, AR, C, sz, sz, si, qs)
 
-# plt.title('s=1/2, %s, z=%.2f, D=%i ' % params)
-# plt.grid()
-# plt.legend()
-# plt.show()
+qs /= np.pi
 
-qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz)
+plt.plot(qs, ssf, 'x')
+plt.grid()
+plt.show()
 
-qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, sz, sz, None)
+filling = np.real(density)
+qm = np.concatenate(
+        (np.linspace(0, filling, 
+                     int(np.floor(N * filling)), endpoint=False
+                     ),
+         np.linspace(filling, 1, 
+                     N - int(np.floor(N * filling))
+                     )
+        )) * np.pi
+
+mom_dist = calc_scf(AL, AR, C, sp, sm, -sz, qm)
+
+qm /= np.pi
+
+plt.plot(qm, mom_dist, 'x')
+plt.grid()
+plt.show()
 
 # vals = stats.linregress(qs[:8], stat_struc_fact[:8])
 # print('K = ', (2 * np.pi * vals.slope))
@@ -607,19 +630,9 @@ qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, sz, sz, None)
 # plt.plot(np.array(error))
 # plt.yscale('log'); plt.grid(); plt.show()
 
-# qm /= np.pi
-# qs /= np.pi
-
-plt.plot(qm, momentum, 'x')
-plt.grid(); plt.show()
-
-plt.plot(qs, stat_struc_fact, 'x')
-plt.grid(); plt.show()
-
-# exit()
+exit()
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
-# path = '/home/baktay.j/vumps/data'
 
 # filename = "%s_energy_%.2f_%.2f_%.2f_%03i_.txt" % params
 # np.savetxt(os.path.join(path, filename), energy)
@@ -647,7 +660,6 @@ path = '/Users/joshuabaktay/Desktop/code/vumps'
 #            np.column_stack((qm, momentum)), 
 #            fmt='%s %s'
 #            )
-
 
 filename = "%s_AL_%.2f_%03i_.txt" % params
 with open(os.path.join(path, filename), 'a') as outfile:
