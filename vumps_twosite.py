@@ -328,6 +328,10 @@ def calc_lfp(A, B, o3):
 
     lfp_AB = lfp_AB.reshape(D, D)
 
+    print('const. diag', lfp_AB[0,0])
+    print('mag. const. diag', np.abs(lfp_AB[0,0]))
+    print('1/sqrt(D)', 1 / np.sqrt(D))
+
     lfp_AB /= lfp_AB[0,0] # yields identity for o3 = identity
 
     return lfp_AB
