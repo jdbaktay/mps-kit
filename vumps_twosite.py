@@ -475,7 +475,6 @@ energy, error, discard_weight = [], [], []
 count, tol, stol, ep = 0, 1e-12, 1e-12, 1e-2
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
-
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
 
 params = (model, z, D)
@@ -586,7 +585,7 @@ N = int(np.floor(correlation_length))
 print('N for scf', N)
 
 qs = np.linspace(0, 1, N) * np.pi
-ssf = calc_scf(AL, AR, C, sz, sz, si, qs)
+ssf = calc_scf(AL, AR, C, n, n, si, qs)
 
 qs /= np.pi
 
@@ -602,7 +601,8 @@ qm = np.concatenate(
          np.linspace(filling, 1, 
                      N - int(np.floor(N * filling))
                      )
-        )) * np.pi
+        )
+        ) * np.pi
 
 mom_dist = calc_scf(AL, AR, C, sp, sm, -sz, qm)
 
