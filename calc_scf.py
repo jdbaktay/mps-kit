@@ -21,6 +21,10 @@ def calc_lfp(A, B, o3):
 
     lfp_AB = lfp_AB.reshape(D, D)
 
+    print('const. diag', lfp_AB[0,0])
+    print('mag. const. diag', np.abs(lfp_AB[0,0]))
+    print('1/sqrt(D)', 1 / np.sqrt(D))
+
     lfp_AB /= lfp_AB[0,0] # yields identity for o3 = identity
 
     return lfp_AB
@@ -37,8 +41,14 @@ def calc_scf(AL, AR, C, o1, o2, o3, mom_vec):
 
     lfp = calc_lfp(AL, AL, o3)
 
+    print('<o1>', calc_expectation_val(o1, AC, lfp))
+    print('<o2>', calc_expectation_val(o2, AC, lfp))
+
     o1 = o1 - calc_expectation_val(o1, AC, lfp) * np.eye(d)
     o2 = o2 - calc_expectation_val(o2, AC, lfp) * np.eye(d)
+
+    print('<o1>', calc_expectation_val(o1, AC, lfp))
+    print('<o2>', calc_expectation_val(o2, AC, lfp))
 
     def left_env(X):
         X = X.reshape(D, D)
@@ -113,6 +123,20 @@ def my_corr_length(A, X0, tol):
                            )
     return -1.0 / np.log(np.abs(evals[-2]))
 
+def calc_expectations(AL, AR, C, O):
+    AC = np.tensordot(AL, C, axes=(2, 0))
+
+    if O.shape[0] == d:
+        tensors = [AC, O, AC.conj()]
+        indices = [(2, 3, 4), (1, 2), (1, 3, 4)]
+        contord = [3, 4, 1, 2]
+        expectation_value = nc.ncon(tensors, indices, contord)
+
+    if O.shape[0] == d**2:
+        pass
+    return expectation_value
+
+
 tol = 1e-12
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
@@ -157,17 +181,33 @@ print('correlation length', correlation_length)
 N = int(np.floor(correlation_length))
 print('N for scf', N)
 
-mom_vec = np.linspace(0, 1, N) * np.pi
+qs = np.linspace(0, 1, N) * np.pi
+ssf = calc_scf(AL, AR, C, n, n, si, qs)
 
-# filling = 0.5
-# mom_vec = np.concatenate((np.linspace(0, filling, int(np.floor(N * filling)), endpoint=False),
-#                     np.linspace(filling, 1, N - int(np.floor(N * filling))))) * np.pi
+qs /= np.pi
 
+plt.plot(qs, ssf, 'x')
+plt.grid()
+plt.show()
 
-scf = calc_scf(AL, AR, C, n, n, si, mom_vec)
-print('scf', scf.shape)
+density = calc_expectations(AL, AR, C, n)
 
-plt.plot(mom_vec / np.pi, scf, 'x')
+filling = np.real(density)
+qm = np.concatenate(
+        (np.linspace(0, filling, 
+                     int(np.floor(N * filling)), endpoint=False
+                     ),
+         np.linspace(filling, 1, 
+                     N - int(np.floor(N * filling))
+                     )
+        )
+        ) * np.pi
+
+mom_dist = calc_scf(AL, AR, C, sp, sm, -sz, qm)
+
+qm /= np.pi
+
+plt.plot(qm, mom_dist, 'x')
 plt.grid()
 plt.show()
 
