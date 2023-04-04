@@ -23,15 +23,9 @@ def calc_dsf(AL, AR, AC,
         indices = [(3, 1, -2), (2, 3), (2, 1, -1)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
+        XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
+        return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
 
-        if p == 0:
-            XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
-
-            return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
-
-        else:
-            return (X - np.exp(-1.0j * p) * XT).ravel()
-        
     def right_env(X):
         X = X.reshape(D, D)
 
@@ -39,14 +33,8 @@ def calc_dsf(AL, AR, AC,
         indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
-        if p == 0:
-            XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
-
-            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
-
-        else:
-            return (X - np.exp(+1.0j * p) * XT).ravel()        
+        XL = np.trace(C.T.conj() @ C @ X) * np.eye(D)
+        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
 
     O = (O 
          - nc.ncon([AC, O, AC.conj()], [[1, 3, 4], [2, 3], [1, 2, 4]]) 
@@ -60,13 +48,20 @@ def calc_dsf(AL, AR, AC,
 
         dsf_p = np.zeros(freq_vec.size)
         for j in range(excit_states.shape[2]):
-            X = excit_states[i,:,j].reshape(D * (d - 1), D)
+            X = excit_states[i,:,j].reshape((d - 1) * D, D)
             B = np.tensordot(VL, X, axes=(2, 0))
+
+            print('left gauge check', spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)])))
+
+            print('left gauge check', spla.norm(nc.ncon([B, AC.conj()], [(1, 2, -2), (1, 2, -1)])))
+
 
             tensors = [B, AC.conj()]
             indices = [(1, 2, -2), (1, 2, -1)]
             contord = [1, 2]
             left_vec = nc.ncon(tensors, indices, contord)
+
+            print('left vec', spla.norm(left_vec))
 
             tensors = [B, AC.conj()]
             indices = [(-1, 2, 1), (-2, 2, 1)]
@@ -110,6 +105,8 @@ def calc_dsf(AL, AR, AC,
             contord = [3, 4, 5, 1, 2]
             t3 = nc.ncon(tensors, indices, contord)
 
+            print('t3', spla.norm(t3))
+
             spec_weight = np.abs(t1 
                                + np.exp(+1j * p) * t2 
                                + np.exp(-1j * p) * t3
@@ -149,7 +146,7 @@ filename = '%s_C_%.2f_%03i_.txt' % params
 C = np.loadtxt(os.path.join(path, filename), dtype=complex)
 C = C.reshape(D, D)
 
-filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, N)
+filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, N); print(filename)
 disp = np.loadtxt(os.path.join(path, filename), dtype=complex)
 
 mom_vec = np.real((disp[:, 0]))
@@ -159,10 +156,10 @@ print('excit_energy', excit_energy.shape)
 print('excit_energy min', excit_energy.min())
 print('excit_energy max', excit_energy.max())
 
-filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, N)
+filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, N); print(filename)
 excit_states = np.loadtxt(os.path.join(path, filename), dtype=complex)
 excit_states = excit_states.reshape(excit_energy.shape[0], 
-                                    D * (d - 1) * D, 
+                                    (d - 1) * D**2, 
                                     excit_energy.shape[1]
                                     )
 
@@ -187,14 +184,23 @@ n = 0.5 * (sz + np.eye(d))
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 
 VL = spla.null_space(AL.conj().reshape(D * d, D).T)
-VL = VL.reshape(D, d, D * (d - 1))
+VL = VL.reshape(D, d, (d - 1) * D)
+
+print('null check 1', 
+      spla.norm(nc.ncon([VL, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
+      )
+
+print('null check 2',
+    spla.norm(nc.ncon([VL, VL.conj()], [(1, 2, -2), (1, 2, -1)])
+               - np.eye(D * (d - 1)))
+    )
 
 gamma = 0.05
 
 q = 4 * gamma
 
 num = ((excit_energy.max() + q) - (excit_energy.min() - q)) / gamma
-num = np.ceil(2 * num)
+num = np.ceil(3 * num)
 
 freq_vec = np.linspace(excit_energy.min() - q, 
                        excit_energy.max() + q, 
@@ -205,17 +211,20 @@ print('gamma', gamma)
 print('freq vec size', freq_vec.size)
 print('delta omega', freq_vec[1] - freq_vec[0])
 
-AC = np.tensordot(C, AR, axes=(1, 0))
+AC = np.tensordot(AL, C, axes=(2, 0))
+print('AC', AC.shape)
 
 dsf = calc_dsf(AL, AR, AC, 
                excit_energy, excit_states, 
                mom_vec, freq_vec, gamma, sx
                )
 
+exit()
+
 print('dsf', dsf.shape)
 
 filename = '%s_dsf_%.2f_%03i_%03i_%.2f_.txt' % (*params, N, gamma)
-np.savetxt(os.path.join(path, filename),
+np.savetxt(filename,
            np.column_stack((freq_vec, dsf)))
 
 
