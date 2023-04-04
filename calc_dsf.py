@@ -16,16 +16,6 @@ def calc_dsf(AL, AR, AC,
              excit_energy, excit_states, 
              mom_vec, freq_vec, gamma, O):
 
-    def left_env(X):
-        X = X.reshape(D, D)
-
-        tensors = [AR, X, AR.conj()]
-        indices = [(3, 1, -2), (2, 3), (2, 1, -1)]
-        contord = [2, 3, 1]
-        XT = nc.ncon(tensors, indices, contord)
-        XR = np.trace(X @ C @ C.T.conj()) * np.eye(D)
-        return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
-
     def right_env(X):
         X = X.reshape(D, D)
 
@@ -51,17 +41,8 @@ def calc_dsf(AL, AR, AC,
             X = excit_states[i,:,j].reshape((d - 1) * D, D)
             B = np.tensordot(VL, X, axes=(2, 0))
 
-            print('left gauge check', spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)])))
-
-            print('left gauge check', spla.norm(nc.ncon([B, AC.conj()], [(1, 2, -2), (1, 2, -1)])))
-
-
-            tensors = [B, AC.conj()]
-            indices = [(1, 2, -2), (1, 2, -1)]
-            contord = [1, 2]
-            left_vec = nc.ncon(tensors, indices, contord)
-
-            print('left vec', spla.norm(left_vec))
+            # print('left gauge check', spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)])))
+            # print('left gauge check', spla.norm(nc.ncon([B, AC.conj()], [(1, 2, -2), (1, 2, -1)])))
 
             tensors = [B, AC.conj()]
             indices = [(-1, 2, 1), (-2, 2, 1)]
@@ -69,16 +50,6 @@ def calc_dsf(AL, AR, AC,
             right_vec = nc.ncon(tensors, indices, contord)
 
             rand_init = np.random.rand(D, D) - 0.5
-
-            left_env_op = spspla.LinearOperator((D * D, D * D), 
-                                                matvec=left_env
-                                                )
-
-            LB = spspla.gmres(left_env_op, left_vec.ravel(), 
-                                           x0=rand_init.ravel(), 
-                                           tol=tol, 
-                                           atol=tol
-                                           )[0].reshape(D, D)
 
             right_env_op = spspla.LinearOperator((D * D, D * D), 
                                                  matvec=right_env
@@ -100,17 +71,7 @@ def calc_dsf(AL, AR, AC,
             contord = [4, 5, 3, 1, 2]
             t2 = nc.ncon(tensors, indices, contord)
 
-            tensors = [LB, AR, O, AR.conj()]
-            indices = [(4, 5), (5, 2, 3), (1, 2), (4, 1, 3)]
-            contord = [3, 4, 5, 1, 2]
-            t3 = nc.ncon(tensors, indices, contord)
-
-            print('t3', spla.norm(t3))
-
-            spec_weight = np.abs(t1 
-                               + np.exp(+1j * p) * t2 
-                               + np.exp(-1j * p) * t3
-                               )
+            spec_weight = np.abs(t1 + np.exp(+1j * p) * t2)
 
             lorentz_j = (2 * np.pi 
                          * lorentzian(freq_vec, excit_energy[i,j], gamma)
