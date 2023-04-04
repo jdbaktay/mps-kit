@@ -36,6 +36,12 @@ def fixed_points(A, B):
 
     lfp_AB /= np.sqrt(norm)
     rfp_AB /= np.sqrt(norm)
+
+    tensors = [rfp_AB, lfp_AB]
+    indices = [(-1, -2), (-4, -3)]
+    P_AB = nc.ncon(tensors, indices).reshape(D**2, D**2)
+    print('PP - P', spla.norm((P_AB @ P_AB) - P_AB))
+
     return lfp_AB, rfp_AB
 
 def left_vector_solver(O, p):
@@ -46,13 +52,8 @@ def left_vector_solver(O, p):
         indices = [(3, 1, -2), (2, 3), (2, 1, -1)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
-        if p == 0:
-            XR = np.trace(X @ rfp_RL) * lfp_RL
-
-            return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
-        else:
-            return (X - np.exp(-1.0j * p) * XT).ravel() 
+        XR = np.trace(X @ rfp_RL) * lfp_RL
+        return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
 
     left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
 
@@ -72,13 +73,8 @@ def right_vector_solver(O, p):
         indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
-        if p == 0:
-            XL = np.trace(lfp_LR @ X) * rfp_LR
-
-            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
-        else:
-            return (X - np.exp(+1.0j * p) * XT).ravel()
+        XL = np.trace(lfp_LR @ X) * rfp_LR
+        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
 
     right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -91,7 +87,7 @@ def right_vector_solver(O, p):
     return v.reshape(D, D)
 
 def Heff(AL, AR, C, Lh, Rh, h, p, Y):
-    Y = Y.reshape(D * (d - 1), D)
+    Y = Y.reshape((d - 1) * D, D)
 
     tensors = [VL, Y]
     indices = [(-1, -2, 1), (1, -3)]
@@ -204,7 +200,7 @@ def Heff(AL, AR, C, Lh, Rh, h, p, Y):
 
 def quasi_particle(AL, AR, C, Lh, Rh, h, p, N):
     f = functools.partial(Heff, AL, AR, C, Lh, Rh, h, p)
-    H = spspla.LinearOperator((D**2 * (d - 1), D**2 * (d - 1)), matvec=f)
+    H = spspla.LinearOperator(((d - 1) * D**2, (d - 1) * D**2), matvec=f)
 
     w, v = spspla.eigsh(H, k=N, which='SR', tol=tol)
     return w, v
@@ -217,15 +213,14 @@ def gs_energy(AL, AR, C, h):
     contord = [5, 6, 7, 8, 9, 10, 1, 2, 3, 4] 
     return nc.ncon(tensors, indices, contord)
 
-
 ########################### Initialization #############################
 excit_energy, excit_states = [], []
 
 tol = 1e-12
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
-
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+num = int(sys.argv[7])
 
 params = (model, z, D)
 
@@ -245,33 +240,11 @@ C = C.reshape(D, D)
 
 Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
-if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, size='two')
-
-if model == 'TFI':
-    h = hamiltonians.TFI(y, z, size='two')
-
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
 
-if model == 'tV':
-    h = hamiltonians.tV(x, y, z)
-
-if d == 2:
-    si = np.array([[1, 0],[0, 1]])
-    sx = np.array([[0, 1],[1, 0]])
-    sy = np.array([[0, -1j],[1j, 0]])
-    sz = np.array([[1, 0],[0, -1]])
-
-if d == 3:
-    si = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    sx = np.array([[0, 0, 0], [0, 0, -1j], [0, 1j, 0]]) 
-    sy = np.array([[0, 0, 1j], [0, 0, 0], [-1j, 0, 0]]) 
-    sz = np.array([[0, -1j, 0], [1j, 0, 0], [0, 0, 0]]) 
-
-sp = 0.5 * (sx + 1.0j * sy)
-sm = 0.5 * (sx - 1.0j * sy)
-n = 0.5 * (sz + np.eye(d))
+if model == 'halfXXZ':
+    h = hamiltonians.XYZ_half(x, y, z, size='two')
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -284,7 +257,10 @@ h = h.reshape(d, d, d, d)
 print('reg. gse', gs_energy(AL, AR, C, h))
 
 VL = spla.null_space(AL.conj().reshape(D * d, D).T)
-VL = VL.reshape(D, d, D * (d - 1))
+
+print('VL', VL.shape)
+
+VL = VL.reshape(D, d, (d - 1) * D)
 
 print('null check 1', 
       spla.norm(nc.ncon([VL, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
@@ -298,13 +274,9 @@ print('null check 2',
 lfp_LR, rfp_LR = fixed_points(AL, AR)    
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
-P_LR = nc.ncon([rfp_LR, lfp_LR], [(-1, -2), (-4, -3)]).reshape(D**2, D**2)
-print('P^2 - P', spla.norm((P_LR @ P_LR) - P_LR))
-
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 21)
+mom_vec = np.linspace(0, np.pi, 51)
 
-num = int(sys.argv[7])
 for p in mom_vec:
     w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
 
@@ -321,13 +293,13 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-filename = '%s_dispfull_%.2f_%03i_%03i_.dat' % (*params, num)
-np.savetxt(filename,
+filename = '%s_disp_%.2f_%03i_%03i_t.dat' % (*params, num)
+np.savetxt(os.path.join(path, filename),
            np.column_stack((mom_vec, excit_energy))
            )
 
-filename = '%s_estatefull_%.2f_%03i_%03i_.dat' % (*params, num)
-with open(filename, 'a') as outfile:
+filename = '%s_estate_%.2f_%03i_%03i_t.dat' % (*params, num)
+with open(os.path.join(path, filename), 'a') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
 
