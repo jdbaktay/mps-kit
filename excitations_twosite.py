@@ -36,12 +36,6 @@ def fixed_points(A, B):
 
     lfp_AB /= np.sqrt(norm)
     rfp_AB /= np.sqrt(norm)
-
-    tensors = [rfp_AB, lfp_AB]
-    indices = [(-1, -2), (-4, -3)]
-    P_AB = nc.ncon(tensors, indices).reshape(D**2, D**2)
-    print('PP - P', spla.norm((P_AB @ P_AB) - P_AB))
-
     return lfp_AB, rfp_AB
 
 def left_vector_solver(O, p):
@@ -93,18 +87,6 @@ def Heff(AL, AR, C, Lh, Rh, h, p, Y):
     indices = [(-1, -2, 1), (1, -3)]
     contord = [1]
     B = nc.ncon(tensors, indices, contord)
-
-    # print('left gauge check 1', 
-    #       spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
-    #       )
-
-    # print('left gauge check 2', 
-    #       spla.norm(nc.ncon([AL, B.conj()], [(1, 2, -2), (1, 2, -1)]))
-    #       )
-
-    # print('perp to gs.', 
-    #       nc.ncon([B, C.conj(), AR.conj()], [(2, 1, 4), (2, 3), (3, 1, 4)])
-    #       )
 
     tensors = [B, AR.conj()]
     indices = [(-1, 1, 2), (-2, 1, 2)]
@@ -278,12 +260,12 @@ lfp_RL, rfp_RL = fixed_points(AR, AL)
 mom_vec = np.linspace(0, np.pi, 51)
 
 for p in mom_vec:
+    print('p', p)
     w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
 
     excit_energy.append(w)
     excit_states.append(v)
-    print('excit. energy', w[0])
-
+    print('excit. energy', w)
 
 excit_energy = np.array(excit_energy)
 print('all excit. energy', excit_energy.shape)
@@ -293,12 +275,12 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-filename = '%s_disp_%.2f_%03i_%03i_t.dat' % (*params, num)
+filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, num)
 np.savetxt(os.path.join(path, filename),
            np.column_stack((mom_vec, excit_energy))
            )
 
-filename = '%s_estate_%.2f_%03i_%03i_t.dat' % (*params, num)
+filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, num)
 with open(os.path.join(path, filename), 'a') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
