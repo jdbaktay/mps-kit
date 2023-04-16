@@ -316,46 +316,98 @@ def vumps(AL, AR, C, h, Hl, Hr, ep):
     epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
 
-def calc_lfp(A, B, o3):
-    def left_transfer_op(X):
-        tensors = [X.reshape(D, D), A, o3, B.conj()]
-        indices = [(4, 5), (2, 5, -2), (1, 2), (1, 4, -1)]
-        contord = [4, 5, 2, 1]
-        return nc.ncon(tensors,indices,contord).ravel()
+def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
+    stat_struc_fact = []
 
-    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-    wl, lfp_AB = spspla.eigs(E, k=1, which='LM', tol=1e-14)
+    AC = np.tensordot(AL, C, axes=(2,0))
 
-    lfp_AB = lfp_AB.reshape(D, D)
+    q = np.linspace(0, 1, N) * np.pi
 
-    print('const. diag', lfp_AB[0,0])
-    print('mag. const. diag', np.abs(lfp_AB[0,0]))
-    print('1/sqrt(D)', 1 / np.sqrt(D))
+    o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
 
-    lfp_AB /= lfp_AB[0,0] # yields identity for o3 = identity
+    tensors = [AC, o1, o2, AC.conj()]
+    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
+    contord = [1,2,3,4,5]
+    s1 = nc.ncon(tensors, indices, contord)
+    print('s --> s1', s1)
 
-    return lfp_AB
+    def left(X,o,Y):
+        indices = [(2,1,-2), (3,2), (3,1,-1)]
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
-def calc_expectation_val(o, AC, lfp):
-    tensors = [lfp, AC, o, AC.conj()]
-    indices = [(3, 4), (2, 4, 5), (1, 2), (1, 3, 5)]
-    return nc.ncon(tensors, indices)
+    def right(X,o,Y):
+        indices = [(2,-1,1), (3,2), (3,-2,1)]
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
 
-def calc_scf(AL, AR, C, o1, o2, o3, mom_vec):
-    scf = []
+    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
+    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
 
-    AC = np.tensordot(AL, C, axes=(2, 0))
+    def left_env(X):
+        X = X.reshape(D, D)
 
-    lfp = calc_lfp(AL, AL, o3)
+        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t.reshape(D * d, D)
+        return (X - np.exp(-1.0j * p) * XT).ravel()
 
-    print('<o1>', calc_expectation_val(o1, AC, lfp))
-    print('<o2>', calc_expectation_val(o2, AC, lfp))
+    def right_env(X):
+        X = X.reshape(D, D)
 
-    o1 = o1 - calc_expectation_val(o1, AC, lfp) * np.eye(d)
-    o2 = o2 - calc_expectation_val(o2, AC, lfp) * np.eye(d)
+        t = AL.reshape(d * D, D) @ X
+        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
+        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
+        return (X - np.exp(+1.0j * p) * XT).ravel()
 
-    print('<o1>', calc_expectation_val(o1, AC, lfp))
-    print('<o2>', calc_expectation_val(o2, AC, lfp))
+    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
+
+    for p in q:
+        print('s(', p, ')')
+        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
+        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
+
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), 
+                             x0=L1.ravel(), tol=10**-12, atol=10**-12
+                             )
+
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), 
+                             x0=R1.ravel(), tol=10**-12, atol=10**-12
+                             )
+
+        L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
+
+        s2 = np.exp(-1.0j*p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
+        s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
+
+        s = s1 + s2 + s3
+
+        stat_struc_fact.append(s.real)
+    return q, np.array(stat_struc_fact)
+
+def calc_momentum(AL, AR, C, o1, o2, o3, N):
+    momentum = []
+
+    AC = np.tensordot(AL, C, axes=(2,0))
+
+    tensors = [AC, o2, o1, AC.conj()]
+    indices = [(3, 1, 2), (4, 3), (5, 4), (5, 1, 2)]
+    contord = [1, 2, 3, 4, 5]
+    s1 = nc.ncon(tensors, indices, contord)
+    print('n --> s1', s1)
+
+    filling = s1.real
+    q = np.concatenate((np.linspace(0, filling, int(np.floor(N * filling)), endpoint=False),
+                        np.linspace(filling, 1, N - int(np.floor(N * filling))))) * np.pi
+
+    def left(X,o,Y):
+        indices = [(2,1,-2), (3,2), (3,1,-1)]
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
+
+    def right(X,o,Y):
+        indices = [(2,-1,1), (3,2), (3,-2,1)]
+        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
+
+    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
+    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
 
     def left_env(X):
         X = X.reshape(D, D)
@@ -375,47 +427,30 @@ def calc_scf(AL, AR, C, o1, o2, o3, mom_vec):
         XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
         return (X - np.exp(+1.0j * p) * XT).ravel()
 
-    tensors = [AC, o2, o1, AC.conj()]
-    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
-    contord = [1,2,3,4,5]
-    s1 = nc.ncon(tensors, indices, contord)
-    print('n --> s1', s1)
+    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
 
-    def left(X,o,Y):
-        indices = [(2, 1, -2), (3, 2), (3, 1, -1)]
-        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
-
-    def right(X,o,Y):
-        indices = [(2,-1,1), (3,2), (3,-2,1)]
-        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
-
-    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
-    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
-
-    for p in mom_vec:
-        print('scf(', p, ')')
+    for p in q:
+        print('n(', p, ')')
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
-        L1 = spspla.gmres(left_env_op, s2l.ravel(), 
-                          x0=(np.random.rand(D, D) - 0.5).ravel(), 
-                          tol=10**-12, 
-                          atol=10**-12
-                          )[0].reshape(D, D)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), 
+                             x0=L1.ravel(), tol=10**-12, atol=10**-12
+                             )
 
-        R1 = spspla.gmres(right_env_op, s3r.ravel(), 
-                          x0=(np.random.rand(D, D) - 0.5).ravel(), 
-                          tol=10**-12, 
-                          atol=10**-12
-                          )[0].reshape(D, D)
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), 
+                             x0=R1.ravel(), tol=10**-12, atol=10**-12
+                             )
 
-        s2 = np.exp(-1.0j * p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
-        s3 = np.exp(+1.0j * p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
+        L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
+
+        s2 = np.exp(-1.0j*p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
+        s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
 
         s = s1 + s2 + s3
 
-        scf.append(s.real)
-    return np.array(scf)
+        momentum.append(s.real)
+    return q, np.array(momentum)
 
 def calc_entent(C):
     s = spla.svdvals(C)
@@ -474,14 +509,12 @@ def calc_expectations(AL, AR, C, O):
     return expectation_value
 
 ##############################################################################
-energy, error, discard_weight = [], [], []
+energy, error = [], []
 
 count, tol, stol, ep = 0, 1e-12, 1e-12, 1e-2
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
-
-params = (model, z, D)
 
 Dmax, delta_D = 0, 0
 
@@ -498,16 +531,14 @@ if model == 'tV':
     h = hamiltonians.tV(x, y, z)
 
 if d == 2:
-    si = np.array([[1, 0],[0, 1]])
-    sx = np.array([[0, 1],[1, 0]])
-    sy = np.array([[0, -1j],[1j, 0]])
-    sz = np.array([[1, 0],[0, -1]])
+    sx = np.array([[0, 1],[1, 0]]) # gets 1/2
+    sy = np.array([[0, -1j],[1j, 0]]) # gets 1/2
+    sz = np.array([[1, 0],[0, -1]]) # gets 1/2
 
 if d == 3:
-    si = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    sx = np.array([[0, 0, 0], [0, 0, -1j], [0, 1j, 0]]) 
-    sy = np.array([[0, 0, 1j], [0, 0, 0], [-1j, 0, 0]]) 
-    sz = np.array([[0, -1j, 0], [1j, 0, 0], [0, 0, 0]]) 
+    sx = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]) # gets 1/sqrt2
+    sy = np.array([[0, -1j, 0], [1j, 0, -1j], [0, 1j, 0]]) # gets 1/sqrt2
+    sz = np.array([[1, 0, 0], [0, 0, 0], [0, 0, -1]])
 
 sp = 0.5 * (sx + 1.0j * sy)
 sm = 0.5 * (sx - 1.0j * sy)
@@ -578,7 +609,6 @@ density = calc_expectations(AL, AR, C, n)
 print('density', density)
 
 # plt.plot(spla.svdvals(C), 'x', label='Schmidt vals')
-
 # plt.title('s=1/2, %s, z=%.2f, D=%i ' % params)
 # plt.grid()
 # plt.legend()
@@ -588,82 +618,22 @@ print('density', density)
 N = int(np.floor(correlation_length))
 print('N for scf', N)
 
-qs = np.linspace(0, 1, N) * np.pi
-ssf = calc_scf(AL, AR, C, n, n, si, qs)
+qm, nk = calc_momentum(AL, AR, C, sp, sm, -sz, N)
+qs, sk = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-qs /= np.pi
-
-plt.plot(qs, ssf, 'x')
-plt.grid()
+plt.plot(qm / np.pi, nk, 'x')
 plt.show()
 
-filling = np.real(density)
-qm = np.concatenate(
-        (np.linspace(0, filling, 
-                     int(np.floor(N * filling)), endpoint=False
-                     ),
-         np.linspace(filling, 1, 
-                     N - int(np.floor(N * filling))
-                     )
-        )
-        ) * np.pi
-
-mom_dist = calc_scf(AL, AR, C, sp, sm, -sz, qm)
-
-qm /= np.pi
-
-plt.plot(qm, mom_dist, 'x')
-plt.grid()
+plt.plot(qs / np.pi, sk, 'x')
 plt.show()
 
-# vals = stats.linregress(qs[:8], stat_struc_fact[:8])
-# print('K = ', (2 * np.pi * vals.slope))
-# print('R = ', vals.rvalue)
-
-# vals = stats.linregress(qs[:16], stat_struc_fact[:16])
-# print('K = ', (2 * np.pi * vals.slope))
-# print('R = ', vals.rvalue)
-
-# vals = stats.linregress(qs[:32], stat_struc_fact[:32])
-# print('K = ', (2 * np.pi * vals.slope))
-# print('R = ', vals.rvalue)
-
-# plt.plot(np.array(energy).real)
-# plt.grid(); plt.show()
-
-# plt.plot(np.array(error))
-# plt.yscale('log'); plt.grid(); plt.show()
-
-exit()
+vals = stats.linregress(qs[:16], sk[:16])
+print('K = ', (2 * np.pi * vals.slope))
+print('R = ', vals.rvalue)
 
 path = '/Users/joshuabaktay/Desktop/code/vumps'
 
-# filename = "%s_energy_%.2f_%.2f_%.2f_%03i_.txt" % params
-# np.savetxt(os.path.join(path, filename), energy)
-
-# filename = "%s_error_%.2f_%.2f_%.2f_%03i_.txt" % params
-# np.savetxt(os.path.join(path, filename), error)
-
-# filename = "%s_entent_%.2f_%.2f_%.2f_%03i_.txt" % params
-# np.savetxt(os.path.join(path, filename), np.array(vonneumann))
-
-# filename = "%s_evals_%.2f_%.2f_%.2f_%03i_.txt" % params
-# np.savetxt(os.path.join(path, filename), np.array(evals))
-
-# filename = "%s_discweight_%.2f_%.2f_%i_.txt" % params
-# np.savetxt(os.path.join(path, filename), disc_weight)
-
-# filename = "%s_statstrucfact_%.2f_%.2f_%.2f_%03i_.dat" % params
-# np.savetxt(os.path.join(path, filename), 
-#            np.column_stack((qs, stat_struc_fact)), 
-#            fmt='%s %s'
-#            )
-
-# filename = "%s_momentum_%.2f_%.2f_%.2f_%03i_.dat" % params
-# np.savetxt(os.path.join(path, filename), 
-#            np.column_stack((qm, momentum)), 
-#            fmt='%s %s'
-#            )
+params = (model, z, D)
 
 filename = "%s_AL_%.2f_%03i_.txt" % params
 with open(os.path.join(path, filename), 'a') as outfile:
