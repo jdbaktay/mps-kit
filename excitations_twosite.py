@@ -202,7 +202,7 @@ tol = 1e-12
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
-num = int(sys.argv[7])
+N = int(sys.argv[7])
 
 params = (model, z, D)
 
@@ -261,7 +261,7 @@ mom_vec = np.linspace(0, np.pi, 51)
 
 for p in mom_vec:
     print('p', p)
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N)
 
     excit_energy.append(w)
     excit_states.append(v)
@@ -275,12 +275,12 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, num)
+filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, N)
 np.savetxt(os.path.join(path, filename),
            np.column_stack((mom_vec, excit_energy))
            )
 
-filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, num)
+filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, N)
 with open(os.path.join(path, filename), 'a') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
