@@ -8,7 +8,7 @@ import os
 import sys
 import matplotlib.colors as colors
 from mps_tools import checks
-import hamiltonians
+# import hamiltonians
 
 def lorentzian(x, x0, gamma):
     return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
@@ -24,12 +24,15 @@ def calc_dsf(AL, AR, AC,
         indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
+        XL = np.trace(X) * (C @ C.T.conj())
+        
+        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
 
-        if p == 0:
-            XL = np.trace(X) * (C @ C.T.conj())
-            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
-        else:
-            return (X - np.exp(+1.0j * p) * XT).ravel()
+        # if p == 0:
+            # XL = np.trace(X) * (C @ C.T.conj())
+            # return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
+        # else:
+        #     return (X - np.exp(+1.0j * p) * XT).ravel()
         
     print('<o>', nc.ncon([AC, O, AC.conj()], [[1, 3, 4], [2, 3], [1, 2, 4]]))
 
@@ -190,7 +193,7 @@ cbar = fig.colorbar(plot, format='%.3f')
 cbar.ax.set_ylabel('S(q, \u03C9)')
 ax.set_xlabel('q')
 ax.set_ylabel('\u03C9')
-# ax.set_ylim((0.3, 3))
+plt.title('D=192, g=0.05, pseudo-inverse')
 plt.show()
 
 exit()
