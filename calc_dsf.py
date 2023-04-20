@@ -8,7 +8,6 @@ import os
 import sys
 import matplotlib.colors as colors
 from mps_tools import checks
-# import hamiltonians
 
 def lorentzian(x, x0, gamma):
     return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
@@ -24,15 +23,12 @@ def calc_dsf(AL, AR, AC,
         indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-        XL = np.trace(X) * (C @ C.T.conj())
-        
-        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
 
-        # if p == 0:
-            # XL = np.trace(X) * (C @ C.T.conj())
-            # return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
-        # else:
-        #     return (X - np.exp(+1.0j * p) * XT).ravel()
+        if p == 0:
+            XL = np.trace(X) * (C @ C.T.conj())
+            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
+        else:
+            return (X - np.exp(+1.0j * p) * XT).ravel()
         
     print('<o>', nc.ncon([AC, O, AC.conj()], [[1, 3, 4], [2, 3], [1, 2, 4]]))
 
@@ -147,10 +143,19 @@ print(filename)
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 
+if d == 2:
+    sx = np.array([[0, 1],[1, 0]]) # gets 1/2
+    sy = np.array([[0, -1j],[1j, 0]]) # gets 1/2
+    sz = np.array([[1, 0],[0, -1]]) # gets 1/2
+
 if d == 3:
     sx = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]) # gets 1/sqrt2
     sy = np.array([[0, -1j, 0], [1j, 0, -1j], [0, 1j, 0]]) # gets 1/sqrt2
     sz = np.array([[1, 0, 0], [0, 0, 0], [0, 0, -1]])
+
+sp = 0.5 * (sx + 1.0j * sy)
+sm = 0.5 * (sx - 1.0j * sy)
+n = 0.5 * (sz + np.eye(d))
 
 ############ Precompute steps ############
 
@@ -170,7 +175,7 @@ print('delta omega', freq_vec[1] - freq_vec[0])
 
 dsf = calc_dsf(AL, AR, np.tensordot(AL, C, axes=(2, 0)), 
                excit_energy, excit_states, 
-               mom_vec, freq_vec, gamma, sx
+               mom_vec, freq_vec, gamma, n
                )
 
 print(dsf.shape)
@@ -196,7 +201,7 @@ ax.set_ylabel('\u03C9')
 plt.title('D=192, g=0.05, pseudo-inverse')
 plt.show()
 
-exit()
+# exit()
 
 filename = '%s_t_%.2f_%03i_%03i_%.2f_.txt' % (*params, N, gamma)
 np.savetxt(filename,
