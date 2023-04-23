@@ -180,11 +180,11 @@ def Heff(AL, AR, C, Lh, Rh, h, p, Y):
     Y = nc.ncon(tensors, indices, contord)
     return Y.ravel()
 
-def quasi_particle(AL, AR, C, Lh, Rh, h, p, N):
+def quasi_particle(AL, AR, C, Lh, Rh, h, p, N, guess):
     f = functools.partial(Heff, AL, AR, C, Lh, Rh, h, p)
     H = spspla.LinearOperator(((d - 1) * D**2, (d - 1) * D**2), matvec=f)
 
-    w, v = spspla.eigsh(H, k=N, which='SR', tol=tol)
+    w, v = spspla.eigsh(H, k=N, v0=guess, which='SR', tol=tol)
     return w, v
 
 def gs_energy(AL, AR, C, h):
@@ -202,11 +202,12 @@ tol = 1e-12
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
-N = int(sys.argv[7])
+g = float(sys.argv[7])
+N = int(sys.argv[8])
 
 params = (model, z, D)
 
-path = '/Users/joshuabaktay/Desktop/local data/states'
+path = ''    # '/Users/joshuabaktay/Desktop/local data/states'
 
 filename = '%s_AL_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
@@ -226,7 +227,7 @@ if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
 
 if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, size='two')
+    h = hamiltonians.XYZ_half(x, y, z, g, size='two')
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -253,15 +254,16 @@ print('null check 2',
                - np.eye(D * (d - 1)))
     )
 
-lfp_LR, rfp_LR = fixed_points(AL, AR)    
+lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 51)
+mom_vec = np.linspace(0, np.pi, 11)
 
 for p in mom_vec:
     print('p', p)
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N)
+    guess = v[:, 0] if p > 0 else None
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=guess)
 
     excit_energy.append(w)
     excit_states.append(v)
@@ -275,31 +277,13 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, N)
-np.savetxt(os.path.join(path, filename),
-           np.column_stack((mom_vec, excit_energy))
-           )
+filename = '%s_disp_%.2f_%03i_%05i_.dat' % (*params, N)
+with open(os.path.join(path, filename), 'w') as outfile:
+    np.savetxt(os.path.join(path, filename),
+               np.column_stack((mom_vec, excit_energy))
+               )
 
-filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, N)
-with open(os.path.join(path, filename), 'a') as outfile:
+filename = '%s_estate_%.2f_%03i_%05i_.dat' % (*params, N)
+with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
