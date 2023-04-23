@@ -515,11 +515,12 @@ count, tol, stol, ep = 0, 1e-12, 1e-12, 1e-2
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+g = float(sys.argv[7])
 
 Dmax, delta_D = 0, 0
 
 if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, size='two')
+    h = hamiltonians.XYZ_half(x, y, z, g, size='two')
 
 if model == 'TFI':
     h = hamiltonians.TFI(y, z, size='two')
@@ -631,30 +632,20 @@ vals = stats.linregress(qs[:16], sk[:16])
 print('K = ', (2 * np.pi * vals.slope))
 print('R = ', vals.rvalue)
 
-path = '/Users/joshuabaktay/Desktop/code/vumps'
+path = ''    # '/Users/joshuabaktay/Desktop/code/vumps'
 
 params = (model, z, D)
 
 filename = "%s_AL_%.2f_%03i_.txt" % params
-with open(os.path.join(path, filename), 'a') as outfile:
+with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in AL:
         np.savetxt(outfile, data_slice)
 
 filename = "%s_AR_%.2f_%03i_.txt" % params
-with open(os.path.join(path, filename), 'a') as outfile:
+with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in AR:
         np.savetxt(outfile, data_slice)
 
 filename = "%s_C_%.2f_%03i_.txt" % params
-np.savetxt(os.path.join(path, filename), C)
-
-
-
-
-
-
-
-
-
-
-
+with open(os.path.join(path, filename), 'w') as outfile:
+    np.savetxt(os.path.join(path, filename), C)
