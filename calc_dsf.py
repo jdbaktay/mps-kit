@@ -29,7 +29,7 @@ def calc_dsf(AL, AR, AC,
             return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
         else:
             return (X - np.exp(+1.0j * p) * XT).ravel()
-        
+
     print('<o>', nc.ncon([AC, O, AC.conj()], [[1, 3, 4], [2, 3], [1, 2, 4]]))
 
     O = (O 
@@ -97,6 +97,7 @@ model = str(sys.argv[1])
 d = int(sys.argv[2])
 D = int(sys.argv[3])
 
+# params not needed
 x = float(sys.argv[4])
 y = float(sys.argv[5])
 z = float(sys.argv[6])
@@ -106,7 +107,7 @@ gamma = float(sys.argv[8])
 
 params = (model, z, D)
 
-path = '/Users/joshuabaktay/Desktop/local data/states'
+path = ''    # '/Users/joshuabaktay/Desktop/local data/states'
 
 filename = '%s_AL_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
@@ -120,7 +121,7 @@ filename = '%s_C_%.2f_%03i_.txt' % params
 C = np.loadtxt(os.path.join(path, filename), dtype=complex)
 C = C.reshape(D, D)
 
-filename = '%s_disp_%.2f_%03i_%03i_.dat' % (*params, N)
+filename = '%s_disp_%.2f_%03i_%05i_.dat' % (*params, N)
 disp = np.loadtxt(os.path.join(path, filename))
 print(filename)
 
@@ -131,7 +132,7 @@ print('excit_energy', excit_energy.shape)
 print('excit_energy min', excit_energy.min())
 print('excit_energy max', excit_energy.max())
 
-filename = '%s_estate_%.2f_%03i_%03i_.dat' % (*params, N)
+filename = '%s_estate_%.2f_%03i_%05i_.dat' % (*params, N)
 excit_states = np.loadtxt(os.path.join(path, filename), dtype=complex)
 excit_states = excit_states.reshape(excit_energy.shape[0], 
                                     (d - 1) * D**2, 
@@ -198,30 +199,10 @@ cbar = fig.colorbar(plot, format='%.3f')
 cbar.ax.set_ylabel('S(q, \u03C9)')
 ax.set_xlabel('q')
 ax.set_ylabel('\u03C9')
-plt.title('D=192, g=0.05, pseudo-inverse')
+plt.title('D='+str(D)+', gamma='+str(gamma)+', N='+str(N))
 plt.show()
 
 # exit()
 
-filename = '%s_t_%.2f_%03i_%03i_%.2f_.txt' % (*params, N, gamma)
-np.savetxt(filename,
-           np.column_stack((freq_vec, dsf)))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+filename = '%s_t_%.2f_%03i_%05i_%.2f_.txt' % (*params, N, gamma)
+np.savetxt(filename, np.column_stack((freq_vec, dsf)))
