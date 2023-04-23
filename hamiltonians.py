@@ -15,7 +15,7 @@ sx_one = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]) # gets 1/sqrt2
 sy_one = np.array([[0, -1j, 0], [1j, 0, -1j], [0, 1j, 0]]) # gets 1/sqrt2
 sz_one = np.array([[1, 0, 0], [0, 0, 0], [0, 0, -1]])
 
-def TFI(J, g, size=str):
+def TFI(J, g, size):
    si = si_half
    sx = sx_half
    sy = sy_half
@@ -27,7 +27,7 @@ def TFI(J, g, size=str):
            )
    return TFI
 
-def XYZ_half(x, y, z, size=str):
+def XYZ_half(x, y, z, g, size):
    si = si_half
    sx = sx_half
    sy = sy_half
@@ -37,10 +37,11 @@ def XYZ_half(x, y, z, size=str):
       XYZ = ((x / 1) * np.kron(sx, sx) 
            + (y / 1) * np.kron(sy, sy)
            + (z / 1) * np.kron(sz, sz)
+           + (- g / 2) * (np.kron(sz, si) + np.kron(si, sz))
            )
    return XYZ
 
-def XYZ_one(x, y, z, size=str):
+def XYZ_one(x, y, z, size):
    si = si_one
    sx = sx_one
    sy = sy_one
