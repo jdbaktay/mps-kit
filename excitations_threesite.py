@@ -341,22 +341,6 @@ if model == 'oneXXZ':
 if model =='tVV2':
     h = hamiltonians.tVV2(1, x, y, z)
 
-if d == 2:
-    si = np.array([[1, 0],[0, 1]])
-    sx = np.array([[0, 1],[1, 0]])
-    sy = np.array([[0, -1j],[1j, 0]])
-    sz = np.array([[1, 0],[0, -1]])
-
-if d == 3:
-    si = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    sx = np.array([[0, 0, 0], [0, 0, -1j], [0, 1j, 0]]) 
-    sy = np.array([[0, 0, 1j], [0, 0, 0], [-1j, 0, 0]]) 
-    sz = np.array([[0, -1j, 0], [1j, 0, 0], [0, 0, 0]]) 
-
-sp = 0.5 * (sx + 1.0j * sy)
-sm = 0.5 * (sx - 1.0j * sy)
-n = 0.5 * (sz + np.eye(d))
-
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
 
@@ -385,12 +369,6 @@ lfp_RL, rfp_RL = fixed_points(AR, AL)
 ######################### Compute excitations ##########################
 mom_vec = np.linspace(0, np.pi, 21)
 
-density = calc_expectations(AL, AR, C, n)
-print('density', density)
-
-# q = 0.1
-# mom_vec = np.array([density - q, density, density + q]) * np.pi
-
 num = int(sys.argv[7])
 for p in mom_vec:
     w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
@@ -408,13 +386,19 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
+plt.plot(mom_vec, excit_energy)
+plt.grid()
+plt.show()
+
+exit()
+
 filename = '%s_disp_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, num)
-np.savetxt(filename,
+np.savetxt(os.path.join(path, filename),
            np.column_stack((mom_vec, excit_energy))
            )
 
 filename = '%s_estate_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, num)
-with open(filename, 'a') as outfile:
+with open(os.path.join(path, filename), 'a') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
 
