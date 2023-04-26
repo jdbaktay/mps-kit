@@ -228,5 +228,47 @@ def HeffTerms_three(AL, AR, C, Hl, Hr, h, ep):
     print('(Hl|R)', np.trace(Hl @ C @ C.T.conj()))
     return Hl, Hr, e
 
+def calc_expectations(AL, AR, C, O):
+    AC = np.tensordot(AL, C, axes=(2, 0))
+
+    if O.shape[0] == d:
+        tensors = [AC, O, AC.conj()]
+        indices = [(1, 3, 4), (2, 3), (1, 2, 4)]
+        contord = [1, 4, 3, 2]
+        expectation_value = nc.ncon(tensors, indices, contord)
+
+    if O.shape[0] == d**2:
+        pass
+    return expectation_value
+
+def fixed_points(A, B):
+    D = A.shape[2]
+
+    def left_transfer_op(X):
+        tensors = [A, X.reshape(D, D), B.conj()]
+        indices = [(2, 1, -2), (3, 2), (3, 1, -1)]
+        contord = [2, 3, 1]
+        return nc.ncon(tensors,indices,contord).ravel()
+
+    def right_transfer_op(X):
+        tensors = [A, X.reshape(D, D), B.conj()]
+        indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
+        contord = [2, 3, 1]
+        return nc.ncon(tensors,indices,contord).ravel()
+
+    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
+    lfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
+
+    E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
+    rfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
+
+    norm = np.trace(lfp_AB @ rfp_AB)
+
+    lfp_AB /= np.sqrt(norm)
+    rfp_AB /= np.sqrt(norm)
+    return lfp_AB, rfp_AB
+
+
+
 
 
