@@ -11,32 +11,7 @@ import os
 
 # My scripts
 import hamiltonians
-from mps_tools import checks, HeffTerms_three
-
-def fixed_points(A, B):
-    def left_transfer_op(X):
-        tensors = [A, X.reshape(D, D), B.conj()]
-        indices = [(2, 1, -2), (3, 2), (3, 1, -1)]
-        contord = [2, 3, 1]
-        return nc.ncon(tensors,indices,contord).ravel()
-
-    def right_transfer_op(X):
-        tensors = [A, X.reshape(D, D), B.conj()]
-        indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
-        contord = [2, 3, 1]
-        return nc.ncon(tensors,indices,contord).ravel()
-
-    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-    lfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
-
-    E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
-    rfp_AB = spspla.eigs(E, k=1, which='LR', tol=1e-14)[1].reshape(D, D)
-
-    norm = np.trace(lfp_AB @ rfp_AB)
-
-    lfp_AB /= np.sqrt(norm)
-    rfp_AB /= np.sqrt(norm)
-    return lfp_AB, rfp_AB
+from mps_tools import checks, HeffTerms_three, fixed_points
 
 def left_vector_solver(O, p):
     def left_env(X):
@@ -46,13 +21,8 @@ def left_vector_solver(O, p):
         indices = [(3, 1, -2), (2, 3), (2, 1, -1)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
-        if p == 0:
-            XR = np.trace(X @ rfp_RL) * lfp_RL
-
-            return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
-        else:
-            return (X - np.exp(-1.0j * p) * XT).ravel()
+        XR = np.trace(X @ rfp_RL) * lfp_RL
+        return (X - np.exp(-1.0j * p) * (XT - XR)).ravel()
 
     left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
 
@@ -72,13 +42,8 @@ def right_vector_solver(O, p):
         indices = [(-1, 1, 2), (2, 3), (-2, 1, 3)]
         contord = [2, 3, 1]
         XT = nc.ncon(tensors, indices, contord)
-
-        if p == 0:
-            XL = np.trace(lfp_LR @ X) * rfp_LR
-
-            return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
-        else:
-            return (X - np.exp(+1.0j * p) * XT).ravel()
+        XL = np.trace(lfp_LR @ X) * rfp_LR
+        return (X - np.exp(+1.0j * p) * (XT - XL)).ravel()
 
     right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
@@ -91,24 +56,12 @@ def right_vector_solver(O, p):
     return v.reshape(D, D)
 
 def Heff(AL, AR, C, Lh, Rh, h, p, Y):
-    Y = Y.reshape(D * (d - 1), D)
+    Y = Y.reshape((d - 1) * D, D)
 
     tensors = [VL, Y]
     indices = [(-1, -2, 1), (1, -3)]
     contord = [1]
     B = nc.ncon(tensors, indices, contord)
-
-    # print('left gauge check 1', 
-    #       spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
-    #       )
-
-    # print('left gauge check 2', 
-    #       spla.norm(nc.ncon([AL, B.conj()], [(1, 2, -2), (1, 2, -1)]))
-    #       )
-
-    # print('perp to gs.', 
-    #       nc.ncon([B, C.conj(), AR.conj()], [(2, 1, 4), (2, 3), (3, 1, 4)])
-    #       )
 
     tensors = [B, AR.conj()]
     indices = [(-1, 1, 2), (-2, 1, 2)]
@@ -269,16 +222,11 @@ def Heff(AL, AR, C, Lh, Rh, h, p, Y):
     Y = nc.ncon(tensors, indices, contord)
     return Y.ravel()
 
-def quasi_particle(AL, AR, C, Lh, Rh, h, p, N):
+def quasi_particle(AL, AR, C, Lh, Rh, h, p, N, guess):
     f = functools.partial(Heff, AL, AR, C, Lh, Rh, h, p)
-    H = spspla.LinearOperator((D**2 * (d - 1), D**2 * (d - 1)), matvec=f)
+    H = spspla.LinearOperator(((d - 1) * D**2, (d - 1) * D**2), matvec=f)
 
-    w, v = spspla.eigsh(H, k=N, which='SR', tol=tol)
-    # print('norm check', 
-    #       np.trace(v.reshape(D * (d - 1), D).conj().T 
-    #              @ v.reshape(D * (d - 1), D)
-    #              )
-    #       )
+    w, v = spspla.eigsh(H, k=N, v0=guess, which='SR', tol=tol)
     return w, v
 
 def gs_energy(AL, AR, C, h):
@@ -289,27 +237,15 @@ def gs_energy(AL, AR, C, h):
     contord = [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4, 5, 6] 
     return nc.ncon(tensors, indices, contord)
 
-def calc_expectations(AL, AR, C, O):
-    AC = np.tensordot(AL, C, axes=(2, 0))
-
-    if O.shape[0] == d:
-        tensors = [AC, O, AC.conj()]
-        indices = [(1, 3, 4), (2, 3), (1, 2, 4)]
-        contord = [1, 4, 3, 2]
-        expectation_value = nc.ncon(tensors, indices, contord)
-
-    if O.shape[0] == d**2:
-        pass
-    return expectation_value
-
 ########################### Initialization #############################
 excit_energy, excit_states = [], []
 
 tol = 1e-12
 
 model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
-
 x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+g = float(sys.argv[7])
+N = int(sys.argv[8])
 
 params = (model, x, y, z, D)
 
@@ -330,7 +266,7 @@ C = C.reshape(D, D)
 Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
 if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, size='three')
+    h = hamiltonians.XYZ_half(x, y, z, g, size='three')
 
 if model == 'TFI':
     h = hamiltonians.TFI(y, z, size='three')
@@ -339,7 +275,7 @@ if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='three')
 
 if model =='tVV2':
-    h = hamiltonians.tVV2(1, x, y, z)
+    h = hamiltonians.tVV2(1, x, y, z) # need to add 'g' param to ham
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -347,12 +283,12 @@ print('gse', gs_energy(AL, AR, C, h))
 ######################### Pre-compute steps ############################
 Lh, Rh, _ = HeffTerms_three(AL, AR, C, Lh, Rh, h, tol)
 
-h -= np.real(gs_energy(AL, AR, C, h)) * np.eye(d**3)  # Regularize hamiltonian
+h -= np.real(gs_energy(AL, AR, C, h)) * np.eye(d**3)
 h = h.reshape(d, d, d, d, d, d) 
 print('reg. gse', gs_energy(AL, AR, C, h))
 
 VL = spla.null_space(AL.conj().reshape(D * d, D).T)
-VL = VL.reshape(D, d, D * (d - 1))
+VL = VL.reshape(D, d, (d - 1) * D)
 
 print('null check 1', 
       spla.norm(nc.ncon([VL, AL.conj()], [(1, 2, -2), (1, 2, -1)]))
@@ -367,15 +303,16 @@ lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 21)
+mom_vec = np.linspace(0, np.pi, 51)
 
-num = int(sys.argv[7])
 for p in mom_vec:
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=num)
+    print('p', p)
+    guess = v[:, 0] if p > 0 else None
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=guess)
 
     excit_energy.append(w)
     excit_states.append(v)
-    print('excit. energy', w[0]) 
+    print('excit. energy', min(w))
 
 
 excit_energy = np.array(excit_energy)
@@ -392,27 +329,16 @@ plt.show()
 
 exit()
 
-filename = '%s_disp_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, num)
-np.savetxt(os.path.join(path, filename),
-           np.column_stack((mom_vec, excit_energy))
-           )
+filename = '%s_disp_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
+with open(os.path.join(path, filename), 'w') as outfile:
+    np.savetxt(os.path.join(path, filename),
+               np.column_stack((mom_vec, excit_energy))
+               )
 
-filename = '%s_estate_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, num)
-with open(os.path.join(path, filename), 'a') as outfile:
+filename = '%s_estate_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
+with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
