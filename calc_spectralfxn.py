@@ -82,6 +82,8 @@ def calc_specfxn(AL, AR, AC,
 
     lz = op_transfer_matrix(AL, AL)
 
+    # We do not regularized ladder operators as in the static case
+
     specfxn = []
     for i in range(mom_vec.size):
         p = mom_vec[i]
@@ -91,9 +93,6 @@ def calc_specfxn(AL, AR, AC,
         for j in range(excit_states.shape[2]):
             X = excit_states[i,:,j].reshape((d - 1) * D, D)
             B = np.tensordot(VL, X, axes=(2, 0))
-
-            # print('left gauge check', spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)])))
-            # print('left gauge check', spla.norm(nc.ncon([B, AC.conj()], [(1, 2, -2), (1, 2, -1)])))
 
             tensors = [lz, B, -sz, AC.conj()]
             indices = [(3, 4), (4, 2, -2), (1, 2), (3, 1, -1)]
