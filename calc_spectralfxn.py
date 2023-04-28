@@ -82,7 +82,7 @@ def calc_specfxn(AL, AR, AC,
 
     lz = op_transfer_matrix(AL, AL)
 
-    # We do not regularized ladder operators as in the static case
+    # As in the static case, we do not regularize ladder operators
 
     specfxn = []
     for i in range(mom_vec.size):
@@ -138,7 +138,7 @@ def calc_specfxn(AL, AR, AC,
             tensors = [LB, AR, O, AR.conj()]
             indices = [(3, 4), (4, 2, 5), (1, 2), (3, 1, 5)]
             contord = [3, 4, 5, 1, 2]
-            t3 = nc.ncon(tensors, indices, contord)
+            t3 = nc.ncon(tensors, indices, contord) # This term is not zero anymore with lz 
 
             spec_weight = np.abs(t1 
                                + np.exp(+1j * p) * t2
