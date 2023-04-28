@@ -171,7 +171,7 @@ gamma = float(sys.argv[8])
 
 params = (model, x, y, z, D)
 
-path = '/Users/joshuabaktay/Desktop/local data/states'
+path = ''      # '/Users/joshuabaktay/Desktop/local data/states'
 
 filename = '%s_AL_%.2f_%.2f_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
