@@ -34,15 +34,21 @@ def op_transfer_matrix(A, B):
 
     rfp_AB = rfp_AB.reshape(D, D)
 
-    # Zero overlap check
-    print('(l|r)', np.trace(lfp_AB @ rfp_AB))
+    # Overlap check
+    norm = np.trace(lfp_AB @ rfp_AB)
+    print('(l|r)', norm)
 
-    # Normalize left fixed point
-    lfp_AB /= np.trace(lfp_AB @ C @ C.conj().T)
+    if np.real(norm) < 1e-3 or np.imag(norm) < 1e-3:
+        print('norm too small')
+        exit()
 
-    # Projector check
-    # P_AB = nc.ncon([rfp_AB, lfp_AB], [(-1, -2), (-4, -3)]).reshape(D**2, D**2)
-    # print('P^2 - P', spla.norm((P_AB @ P_AB) - P_AB))
+    # Normalize fixed points
+    lfp_AB /= np.sqrt(norm)
+    rfp_AB /= np.sqrt(norm)
+
+    # Projector check; comment out for large bond dim
+    P_AB = nc.ncon([rfp_AB, lfp_AB], [(-1, -2), (-4, -3)]).reshape(D**2, D**2)
+    print('P^2 - P', spla.norm((P_AB @ P_AB) - P_AB))
 
     return lfp_AB
 
@@ -138,7 +144,7 @@ def calc_specfxn(AL, AR, AC,
             tensors = [LB, AR, O, AR.conj()]
             indices = [(3, 4), (4, 2, 5), (1, 2), (3, 1, 5)]
             contord = [3, 4, 5, 1, 2]
-            t3 = nc.ncon(tensors, indices, contord) # This term is not zero anymore with lz 
+            t3 = nc.ncon(tensors, indices, contord) # This term is not zero anymore with lz
 
             spec_weight = np.abs(t1 
                                + np.exp(+1j * p) * t2
@@ -165,27 +171,28 @@ D = int(sys.argv[3])
 x = float(sys.argv[4])
 y = float(sys.argv[5])
 z = float(sys.argv[6])
+g = float(sys.argv[7])
 
-N = int(sys.argv[7])
-gamma = float(sys.argv[8])
+N = int(sys.argv[8])
+gamma = float(sys.argv[9])
 
-params = (model, x, y, z, D)
+params = (model, x, y, z, g, D)
 
-path = ''      # '/Users/joshuabaktay/Desktop/local data/states'
+path = '' #'/Users/joshuabaktay/Desktop/local data/states'
 
-filename = '%s_AL_%.2f_%.2f_%.2f_%03i_.txt' % params
+filename = '%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AL = AL.reshape(d, D, D).transpose(1, 0, 2)
 
-filename = '%s_AR_%.2f_%.2f_%.2f_%03i_.txt' % params
+filename = '%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 AR = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AR = AR.reshape(d, D, D).transpose(1, 0, 2)
 
-filename = '%s_C_%.2f_%.2f_%.2f_%03i_.txt' % params
+filename = '%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 C = np.loadtxt(os.path.join(path, filename), dtype=complex)
 C = C.reshape(D, D)
 
-filename = '%s_disp_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, N)
+filename = '%s_disp_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
 disp = np.loadtxt(os.path.join(path, filename))
 print(filename)
 mom_vec = disp[:, 0]
@@ -195,7 +202,7 @@ print('excit_energy', excit_energy.shape)
 print('excit_energy min', excit_energy.min())
 print('excit_energy max', excit_energy.max())
 
-filename = '%s_estate_%.2f_%.2f_%.2f_%03i_%03i_.dat' % (*params, N)
+filename = '%s_estate_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
 excit_states = np.loadtxt(os.path.join(path, filename), dtype=complex)
 excit_states = excit_states.reshape(excit_energy.shape[0], 
                                     (d - 1) * D**2, 
@@ -251,8 +258,8 @@ Z = specfxn
 
 print(Z.min(), Z.max())
 
-# Z_min, Z_max = Z.min(), Z.max()
-# Z = (Z - Z_min) / (Z_max - Z_min)
+Z_min, Z_max = Z.min(), Z.max()
+Z = (Z - Z_min) / (Z_max - Z_min)
 
 print(Z.min(), Z.max())
 
@@ -265,9 +272,7 @@ ax.set_ylabel('\u03C9')
 plt.title('D='+str(D)+', gamma='+str(gamma)+', N='+str(N))
 plt.show()
 
-exit()
-
-filename = '%s_Ak_%.2f_%03i_%05i_%.2f_.txt' % (*params, N, gamma)
+filename = '%s_Ap_%.2f_%03i_%05i_%.2f_.txt' % (*params, N, gamma)
 np.savetxt(filename, np.column_stack((freq_vec, specfxn)))
 
 
