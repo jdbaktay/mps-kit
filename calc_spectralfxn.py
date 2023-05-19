@@ -9,6 +9,9 @@ import sys
 import matplotlib.colors as colors
 from mps_tools import checks
 
+def lorentzian(x, x0, gamma):
+    return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
+
 def op_transfer_matrix(A, B):
     def left_transfer_op(X):
         tensors = [X.reshape(D, D), A, -sz, B.conj()]
@@ -24,13 +27,13 @@ def op_transfer_matrix(A, B):
 
     E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
     wl, lfp_AB = spspla.eigs(E, k=1, which='LM', tol=1e-14)
-    print('wl', wl)
+    print('wl', wl, np.abs(wl))
 
     lfp_AB = lfp_AB.reshape(D, D)
 
     E = spspla.LinearOperator((D * D, D * D), matvec=right_transfer_op)
     wr, rfp_AB = spspla.eigs(E, k=1, which='LM', tol=1e-14)
-    print('wr', wr)
+    print('wr', wr, np.abs(wr))
 
     rfp_AB = rfp_AB.reshape(D, D)
 
@@ -38,22 +41,15 @@ def op_transfer_matrix(A, B):
     norm = np.trace(lfp_AB @ rfp_AB)
     print('(l|r)', norm)
 
-    if np.real(norm) < 1e-3 or np.imag(norm) < 1e-3:
-        print('norm too small')
-        exit()
-
-    # Normalize fixed points
-    lfp_AB /= np.sqrt(norm)
-    rfp_AB /= np.sqrt(norm)
+    # Normalize fixed points # (supposedly do not need to normalize)
+    # lfp_AB /= np.sqrt(norm)
+    # rfp_AB /= np.sqrt(norm)
 
     # Projector check; comment out for large bond dim
-    P_AB = nc.ncon([rfp_AB, lfp_AB], [(-1, -2), (-4, -3)]).reshape(D**2, D**2)
-    print('P^2 - P', spla.norm((P_AB @ P_AB) - P_AB))
+    # P_AB = nc.ncon([rfp_AB, lfp_AB], [(-1, -2), (-4, -3)]).reshape(D**2, D**2)
+    # print('P^2 - P', spla.norm((P_AB @ P_AB) - P_AB))
 
     return lfp_AB
-
-def lorentzian(x, x0, gamma):
-    return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
 
 def calc_specfxn(AL, AR, AC, 
                  excit_energy, excit_states, 
@@ -68,7 +64,7 @@ def calc_specfxn(AL, AR, AC,
         XT = nc.ncon(tensors, indices, contord)
 
         # We do not need the pseudo-inverse even for p=0 since the 
-        # leading eval of the mixed transfer op is < 1
+        # leading eval of the operator transfer op is < 1
 
         return (X - np.exp(-1.0j * p) * XT).ravel()
 
@@ -144,7 +140,7 @@ def calc_specfxn(AL, AR, AC,
             tensors = [LB, AR, O, AR.conj()]
             indices = [(3, 4), (4, 2, 5), (1, 2), (3, 1, 5)]
             contord = [3, 4, 5, 1, 2]
-            t3 = nc.ncon(tensors, indices, contord) # This term is not zero anymore with lz
+            t3 = nc.ncon(tensors, indices, contord) # This term is not zero anymore with lz (in LB)
 
             spec_weight = np.abs(t1 
                                + np.exp(+1j * p) * t2
@@ -178,7 +174,7 @@ gamma = float(sys.argv[9])
 
 params = (model, x, y, z, g, D)
 
-path = '' #'/Users/joshuabaktay/Desktop/local data/states'
+path = '' #'/Users/joshuabaktay/Desktop/local data/states/'
 
 filename = '%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
@@ -272,8 +268,10 @@ ax.set_ylabel('\u03C9')
 plt.title('D='+str(D)+', gamma='+str(gamma)+', N='+str(N))
 plt.show()
 
+exit()
+
 filename = '%s_Ap_%.2f_%03i_%05i_%.2f_.txt' % (*params, N, gamma)
-np.savetxt(filename, np.column_stack((freq_vec, specfxn)))
+np.savetxt(os.path.join(path, filename), np.column_stack((freq_vec, specfxn)))
 
 
 
