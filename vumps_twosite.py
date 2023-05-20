@@ -523,7 +523,7 @@ if model == 'halfXXZ':
     h = hamiltonians.XYZ_half(x, y, z, g, size='two')
 
 if model == 'TFI':
-    h = hamiltonians.TFI(y, z, size='two')
+    h = hamiltonians.TFI(x, g, size='two')
 
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
