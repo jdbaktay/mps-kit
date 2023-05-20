@@ -39,6 +39,22 @@ def XYZ_half(x, y, z, g, size):
            + (z / 4) * np.kron(sz, sz)
            + (- g / 2) * (np.kron(sz, si) + np.kron(si, sz))
            )
+
+   if size == 'three':
+      XYZ = ((x / 4) * (1 / 2) * (np.kron(np.kron(sx, sx), si)
+                                + np.kron(si, np.kron(sx, sx))
+                                )
+
+           + (y / 4) * (1 / 2) * (np.kron(np.kron(sy, sy), si)
+                                + np.kron(si, np.kron(sy, sy))
+                                )
+           + (z / 4) * (1 / 2) * (np.kron(np.kron(sz, sz), si)
+                                + np.kron(si, np.kron(sz, sz))
+                                )
+           + (- g / 3) * (np.kron(np.kron(sz, si), si)
+                        + np.kron(np.kron(si, sz), si)
+                        + np.kron(np.kron(si, si), sz))
+        )
    return XYZ
 
 def XYZ_one(x, y, z, size):
