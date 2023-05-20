@@ -268,8 +268,6 @@ ax.set_ylabel('\u03C9')
 plt.title('D='+str(D)+', gamma='+str(gamma)+', N='+str(N))
 plt.show()
 
-exit()
-
 filename = '%s_Ap_%.2f_%.2f_%.2f_%.2f_%03i_%05i_%.2f_.txt' % (*params, N, gamma)
 np.savetxt(os.path.join(path, filename), np.column_stack((freq_vec, specfxn)))
 
