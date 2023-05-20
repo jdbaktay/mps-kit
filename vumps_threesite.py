@@ -13,44 +13,8 @@ import os
 
 from scipy import stats
 
-def left_ortho(A, X0, tol, stol):
-    def left_fixed_point(A, B):
-        def left_transfer_op(X):
-            tensors = [A, X.reshape(D, D), B.conj()]
-            indices = [(1,2,-2), (3, 2), (1, 3, -1)]
-            contord = [2, 3, 1]
-            return nc.ncon(tensors,indices,contord).ravel()
-
-        E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-        evals, evecs = spspla.eigs(E, k=1, which="LR", v0=X0, tol=tol)
-        return evals[0], evecs[:,0].reshape(D, D)
-
-    eval_LR, l = left_fixed_point(A, A)
-
-    l = l + l.T.conj()
-    l /= np.trace(l)
-
-    A = A/np.sqrt(eval_LR)
-
-    w, v = spla.eigh(l)
-    L = np.diag(np.sqrt(np.abs(w))) @ v.T.conj()
-
-    u, s, vh = spla.svd(L)
-
-    si = 1/s
-    for i in range(s.size):
-        if s[i] < stol:
-            si[i] = 0
-
-    Li = vh.conj().T @ np.diag(1/s) @ u.conj().T
-
-    AL = nc.ncon([L, A, Li], [(-2,1), (-1,1,2), (2,-3)])
-    return AL, L
-
-def right_ortho(A, X0, tol, stol):
-    A, L = left_ortho(np.transpose(A, (0, 2, 1)), X0, tol, stol)
-    A, L = np.transpose(A, (0, 2, 1)), np.transpose(L, (1, 0))
-    return A, L
+import mps_tools
+import hamiltonians
 
 def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     Al = AL.reshape(d * D, D)
@@ -71,17 +35,10 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
         X = X.reshape(d, D, d, D)
 
         tensors = [AL, AL, X, h, AL.conj(), AL.conj()]
-        indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
+        indices = [(7, 1, 2), (8, 2, 4), (9, 4, -3, -4), 
+                   (5, 6, -1, 7, 8, 9), (5, 1, 3), (6, 3, -2)]
         contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         H1 = nc.ncon(tensors,indices,contord)
-
-        # t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
-        # t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
-        # t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
-        # t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
-        # t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
-        # t = t.reshape(D,d,d,D).transpose(1,0,2,3)
-        # print(spla.norm(t - H1))
 
         tensors = [AL, X, h, AL.conj()]
         indices = [(4, 1, 2), (5, 2, 6, -4), (3, -1, -3, 4, 5, 6), (3, 1, -2)]
@@ -94,7 +51,8 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
         H3 = nc.ncon(tensors,indices,contord)
 
         tensors = [X, AR, AR, h, AR.conj(), AR.conj()]
-        indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
+        indices = [(-1, -2, 7, 4), (8, 4, 2), (9, 2, 1), 
+                   (-3, 5, 6, 7, 8, 9), (5, -4, 3), (6, 3, 1)]
         contord = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         H4 = nc.ncon(tensors,indices,contord)
 
@@ -133,10 +91,14 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     AL, AR = [], []
 
     for i in range(AL_new.shape[0]):
-        AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, t)), mode='constant'))
+        AL.append(np.pad(AL_new[i,:,:], pad_width=((0, delta_D), (0, t)), 
+                                        mode='constant')
+        )
 
     for i in range(AR_new.shape[0]):
-        AR.append(np.pad(AR_new[i,:,:], pad_width=((0, t), (0, delta_D)), mode='constant'))
+        AR.append(np.pad(AR_new[i,:,:], pad_width=((0, t), (0, delta_D)), 
+                                        mode='constant')
+        )
 
     C = np.pad(C, pad_width=((0, delta_D), (0, delta_D)), mode='constant')
     Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='minimum')
@@ -145,14 +107,16 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
 
 def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
-    indices = [(4,7,8), (5,8,10), (6,10,-2), (1,2,3,4,5,6), (1,7,9), (2,9,11), (3,11,-1)]
-    contord = [7,8,9,10,11,1,2,3,4,5,6]
+    indices = [(4, 7, 8), (5, 8, 10), (6, 10, -2), (1, 2, 3, 4, 5, 6), 
+               (1, 7, 9), (2, 9, 11), (3, 11, -1)]
+    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
     hl = nc.ncon(tensors,indices,contord)
     el = np.trace(hl @ C @ C.T.conj())
 
     tensors = [AR, AR, AR, h, AR.conj(), AR.conj(), AR.conj()]
-    indices = [(4,-1,10), (5,10,8), (6,8,7), (1,2,3,4,5,6), (1,-2,11), (2,11,9), (3,9,7)]
-    contord = [7,8,9,10,11,1,2,3,4,5,6]
+    indices = [(4, -1, 10), (5, 10, 8), (6, 8, 7), (1, 2, 3, 4, 5, 6), 
+               (1, -2, 11), (2, 11, 9), (3, 9, 7)]
+    contord = [7, 8, 9, 10, 11, 1, 2, 3, 4, 5, 6]
     hr = nc.ncon(tensors,indices,contord)
     er = np.trace(C.T.conj() @ C @ hr)
 
@@ -251,10 +215,10 @@ def Apply_HAC(hl_mid, hr_mid, AL, AR, h, Hl, Hr ,X):
 
 def calc_new_A(AL, AR, AC, C):
     Al = AL.reshape(d * D, D)
-    Ar = AR.transpose(1,0,2).reshape(D, d * D)
+    Ar = AR.transpose(1, 0, 2).reshape(D, d * D)
 
     def calcnullspace(n):
-        u,s,vh = spla.svd(n, full_matrices=True)
+        u, s, vh = spla.svd(n, full_matrices=True)
 
         right_null = vh.conj().T[:,D:]
         left_null = u.conj().T[D:,:]
@@ -374,12 +338,9 @@ def calc_discard_weight(AL, AR, C, h, Hl, Hr):
 def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
     stat_struc_fact = []
 
-    # q = nonuniform_mesh(npts_left=0, npts_mid=N, npts_right=20, k0=0.05, dk=0.05) * np.pi
-    N = int(np.floor(correlation_length))
-    print('N for s(k)', N)
-    q = np.linspace(0, 1, N) * np.pi
-
     AC = np.tensordot(AL, C, axes=(2,0))
+
+    q = np.linspace(0, 1, N) * np.pi
 
     o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
     o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
@@ -423,8 +384,13 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), 
+                             x0=L1.ravel(), tol=10**-12, atol=10**-12
+                             )
+
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), 
+                             x0=R1.ravel(), tol=10**-12, atol=10**-12
+                             )
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
@@ -442,18 +408,11 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
     AC = np.tensordot(AL, C, axes=(2,0))
 
     tensors = [AC, o2, o1, AC.conj()]
-    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
-    contord = [1,2,3,4,5]
+    indices = [(3, 1, 2), (4, 3), (5, 4), (5, 1, 2)]
+    contord = [1, 2, 3, 4, 5]
     s1 = nc.ncon(tensors, indices, contord)
     print('n --> s1', s1)
 
-    # q = nonuniform_mesh(npts_left=10, npts_mid=N, npts_right=10, k0=0.5, dk=0.1) * np.pi
-    # N = int(np.ceil(correlation_length) / 2) * 2 - 1
-
-    N = int(np.floor(correlation_length))
-    print('N for n(k)', N)
-
-    # q = np.linspace(0, 1, N) * np.pi
     filling = s1.real
     q = np.concatenate((np.linspace(0, filling, int(np.floor(N * filling)), endpoint=False),
                         np.linspace(filling, 1, N - int(np.floor(N * filling))))) * np.pi
@@ -494,8 +453,13 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
         left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), x0=L1.ravel(), tol=10**-12, atol=10**-12)
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), x0=R1.ravel(), tol=10**-12, atol=10**-12)
+        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), 
+                             x0=L1.ravel(), tol=10**-12, atol=10**-12
+                             )
+
+        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), 
+                             x0=R1.ravel(), tol=10**-12, atol=10**-12
+                             )
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
 
@@ -552,76 +516,68 @@ def my_corr_length(A, X0, tol):
     print('argmax', np.argmax(evals), evals)
     return -1.0 / np.log(np.abs(evals[-2]))
 
-def checks(AL, AR, C):
-    print('left iso', spla.norm(nc.ncon([AL, AL.conj()], [[3,1,-2], [3,1,-1]]) - np.eye(D)))
-    print('right iso', spla.norm(nc.ncon([AR, AR.conj()], [[3,-1,1], [3,-2,1]]) - np.eye(D)))
-    print('norm', nc.ncon([AL, AL.conj(), C, C.conj(), AR, AR.conj()], [[7,1,2],[7,1,3],[2,4],[3,5],[8,4,6],[8,5,6]]))
-    print('ALC - CAR', spla.norm(nc.ncon([AL,C],[[-1,-2,1],[1,-3]]) - nc.ncon([C,AR],[[-2,1], [-1,1,-3]])))
+def calc_expectations(AL, AR, C, O):
+    AC = np.tensordot(AL, C, axes=(2,0))
+
+    if O.shape[0] == d:
+        tensors = [AC, O, AC.conj()]
+        indices = [(2, 3, 4), (1, 2), (1, 3, 4)]
+        contord = [3, 4, 1, 2]
+        expectation_value = nc.ncon(tensors, indices, contord)
+
+    if O.shape[0] == d**2:
+        pass
+    return expectation_value
 
 ##############################################################################
-
 energy, error = [], []
 
-count, d = 0, 2
+count, tol, stol, ep = 0, 1e-12, 1e-12, 1e-2
 
-tol, stol, ep = 1e-12, 1e-12, 1e-2
+model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+g = float(sys.argv[7])
 
-D = int(sys.argv[4])
-Dmax = 0
-delta_D = 0
-N = 1000
+Dmax, delta_D = 0, 0
 
-si = np.array([[1, 0],[0, 1]])
-sx = np.array([[0, 1],[1, 0]])
-sy = np.array([[0, -1j],[1j, 0]])
-sz = np.array([[1, 0],[0, -1]])
+if model == 'halfXXZ':
+    h = hamiltonians.XYZ_half(x, y, z, g, size='three')
 
-sp = 0.5 * (sx + 1.0j*sy)
-sm = 0.5 * (sx - 1.0j*sy)
+if model == 'oneXXZ':
+    h = hamiltonians.XYZ_one(x, y, z, size='three')
+
+if model == 'tVV2':
+    h = hamiltonians.tVV2(1, x, y, z)
+
+if d == 2:
+    si = np.array([[1, 0],[0, 1]])
+    sx = np.array([[0, 1],[1, 0]])
+    sy = np.array([[0, -1j],[1j, 0]])
+    sz = np.array([[1, 0],[0, -1]])
+
+if d == 3:
+    si = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    sx = np.array([[0, 0, 0], [0, 0, -1j], [0, 1j, 0]]) 
+    sy = np.array([[0, 0, 1j], [0, 0, 0], [-1j, 0, 0]]) 
+    sz = np.array([[0, -1j, 0], [1j, 0, 0], [0, 0, 0]]) 
+
+sp = 0.5 * (sx + 1.0j * sy)
+sm = 0.5 * (sx - 1.0j * sy)
 n = 0.5 * (sz + np.eye(d))
 
-J, g = -1, -0.5
-TFI = ((J / 4) * np.kron(si, np.kron(sx, sx)) 
-    + (g / 2) * np.kron(si, np.kron(sz, si)))
-
-x, y, z, m = -1, -1, 0, 0
-XYZ = ((x / 4) * np.kron(np.kron(sx, sx), si) 
-     + (y / 4) * np.kron(np.kron(sy, sy), si) 
-     + (z / 4) * np.kron(np.kron(sz, sz), si) 
-     + (m/2) * np.kron(np.kron(sz, si), si))
-
-t, V, V2, g = 1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-tVV2 = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-      + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
-      + (V / 8) * np.kron(np.kron(sz, sz), si)
-      + (V / 8) * np.kron(si, np.kron(sz, sz))
-      + (V2 / 4) * np.kron(np.kron(sz, si), sz)
-      + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
-                   + np.kron(np.kron(si, si), sz)))
-
-t, t2, tc, g = 1, float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-       + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
-       + (t2 / 2) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
-       + (tc / 4) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
-       + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
-                    + np.kron(np.kron(si, si), sz)))
-
-h = tt2tc
 h = h.reshape(d, d, d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5
 Hl, Hr = np.eye(D, dtype=A.dtype), np.eye(D, dtype=A.dtype)
 
-AL, C = left_ortho(A, C, tol/100, stol)
-AR, C = right_ortho(AL, C, tol/100, stol)
-checks(AL, AR, C)
+mps = AL, AR, C = mps_tools.mix_gauge(A, C, tol, stol)
+mps_tools.checks(*mps)
 
 AL, AR, C, Hl, Hr, *_ = vumps(AL, AR, C, h, Hl, Hr, ep)
 
-AL, C = left_ortho(AR, C, tol/100, stol)
-AR, C = right_ortho(AL, C, tol/100, stol)
+AL, C = mps_tools.left_gauge(AR, C, tol / 100, stol)
+AR, C = mps_tools.right_gauge(AL, C, tol / 100, stol)
 
 while (ep > tol or D < Dmax) and count < 5000:
     print(count)
@@ -631,6 +587,7 @@ while (ep > tol or D < Dmax) and count < 5000:
 
     if ep < tol and delta_D != 0:
         AL, AR, C, Hl, Hr = dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D)
+        
         D = D + delta_D
 
         print('AL new', AL.shape)
@@ -641,7 +598,7 @@ while (ep > tol or D < Dmax) and count < 5000:
 
     AL, AR, C, Hl, Hr, e, epl, epr = vumps(AL, AR, C, h, Hl, Hr, ep)
 
-    checks(AL, AR, C)
+    mps_tools.checks(AL, AR, C)
     print('energy', e)
     print('epl', epl)
     print('epr', epr)
@@ -658,12 +615,7 @@ while (ep > tol or D < Dmax) and count < 5000:
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-# print('V, V2, g:', V, V2, g)
-print('t2, tc, g:', t2, tc, g)
-
-
-#AL, C = left_ortho(AR, C, tol/100, stol)
-checks(AL, AR, C)
+mps_tools.checks(AL, AR, C)
 
 correlation_length = my_corr_length(AL, C, tol/100)
 print('correlation length', correlation_length)
@@ -674,49 +626,34 @@ print('entanglement entropy', *vonneumann)
 disc_weight = calc_discard_weight(AL, AR, C, h, Hl, Hr)
 print('discarded weight', disc_weight)
 
-qm, momentum = calc_momentum(AL, AR, C, sp, sm, -sz, N)
-qs, stat_struc_fact = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
+density = calc_expectations(AL, AR, C, n)
+print('density', density)
 
-params = stats.linregress(qs[:8], stat_struc_fact[:8])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+# plt.plot(spla.svdvals(C), 'x', label='Schmidt vals')
+# plt.grid()
+# plt.legend()
+# plt.yscale('log')
+# plt.show()
 
-params = stats.linregress(qs[:16], stat_struc_fact[:16])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+N = int(np.floor(correlation_length))
+print('N for scf', N)
 
-params = stats.linregress(qs[:32], stat_struc_fact[:32])
-print('K = ', (2 * np.pi * params.slope))
-print('R = ', params.rvalue)
+qm, nk = calc_momentum(AL, AR, C, sp, sm, -sz, N)
+qs, sk = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-# plt.plot(np.array(energy).real)
-# plt.grid(); plt.show()
+plt.plot(qm / np.pi, nk, 'x')
+plt.show()
 
-# plt.plot(np.array(error))
-# plt.yscale('log'); plt.grid(); plt.show()
+plt.plot(qs / np.pi, sk, 'x')
+plt.show()
 
-model = 'tt2tc'
-qm /= np.pi
-qs /= np.pi
+vals = stats.linregress(qs[:16], sk[:16])
+print('K = ', (2 * np.pi * vals.slope))
+print('R = ', vals.rvalue)
 
-# filename = "%s_nk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
-# np.savetxt(filename, np.column_stack((qm, momentum)), fmt='%s %s')
-# plt.plot(qm, momentum, 'x')
-# plt.grid(); plt.show()
+path = '' #'/Users/joshuabaktay/Desktop/local data/states'
 
-# filename = "%s_sk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
-# np.savetxt(filename, np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-# plt.plot(qs, stat_struc_fact, 'x')
-# plt.grid(); plt.show()
-
-# path = ''    # /Users/joshuabaktay/Desktop/code/vumps' 
-path = '/home/baktay.j/vumps/data'
-
-# filename = "%s_energy_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
-# np.savetxt(os.path.join(path, filename), energy)
-
-# filename = "%s_error_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
-# np.savetxt(os.path.join(path, filename), error)
+params = (model, x, y, z, g, D)
 
 # filename = "%s_entent_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
 # np.savetxt(os.path.join(path, filename), np.array(vonneumann))
@@ -724,24 +661,26 @@ path = '/home/baktay.j/vumps/data'
 # filename = "%s_evals_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
 # np.savetxt(os.path.join(path, filename), np.array(evals))
 
-# filename = "%s_discweight_%.2f_%.2f_%i_.txt" % (model, V, V2, D)
-# np.savetxt(os.path.join(path, filename), disc_weight)
-
-# filename = "%s_statstrucfact_%.2f_%.2f_%.2f_%03i_.dat" % (model, t2, tc, g, D)
+# filename = "%s_sk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
 # np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
 
-# filename = "%s_momentum_%.2f_%.2f_%.2f_%03i_.dat" % (model, t2, tc, g, D)
+# filename = "%s_nk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
 # np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)), fmt='%s %s')
 
-# filename = "%s_AL_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
-# with open(os.path.join(path, filename), 'a') as outfile:
-#     for data_slice in AL:
-#         np.savetxt(outfile, data_slice)
+filename = "%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
+with open(os.path.join(path, filename), 'w') as outfile:
+    for data_slice in AL:
+        np.savetxt(outfile, data_slice)
 
-# filename = "%s_AR_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
-# with open(os.path.join(path, filename), 'a') as outfile:
-#     for data_slice in AR:
-#         np.savetxt(outfile, data_slice)
+filename = "%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
+with open(os.path.join(path, filename), 'w') as outfile:
+    for data_slice in AR:
+        np.savetxt(outfile, data_slice)
 
-# filename = "%s_C_%.2f_%.2f_%.2f_%03i_.txt" % (model, t2, tc, g, D)
-# np.savetxt(os.path.join(path, filename), C)
+filename = "%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
+with open(os.path.join(path, filename), 'w') as outfile:
+    np.savetxt(os.path.join(path, filename), C)
+
+
+
+
