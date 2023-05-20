@@ -205,19 +205,19 @@ x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
 g = float(sys.argv[7])
 N = int(sys.argv[8])
 
-params = (model, z, D)
+params = (model, x, y, z, g, D)
 
 path = '' #'/Users/joshuabaktay/Desktop/local data/states'
 
-filename = '%s_AL_%.2f_%03i_.txt' % params
+filename = '%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AL = AL.reshape(d, D, D).transpose(1, 0, 2)
 
-filename = '%s_AR_%.2f_%03i_.txt' % params
+filename = '%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 AR = np.loadtxt(os.path.join(path, filename), dtype=complex)
 AR = AR.reshape(d, D, D).transpose(1, 0, 2)
 
-filename = '%s_C_%.2f_%03i_.txt' % params
+filename = '%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
 C = np.loadtxt(os.path.join(path, filename), dtype=complex)
 C = C.reshape(D, D)
 
