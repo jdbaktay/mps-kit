@@ -223,11 +223,17 @@ C = C.reshape(D, D)
 
 Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
+if model == 'halfXXZ':
+    h = hamiltonians.XYZ_half(x, y, z, g, size='two')
+
+if model == 'TFI':
+    h = hamiltonians.TFI(x, g, size='two')
+
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
 
-if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, g, size='two')
+if model == 'tV':
+    h = hamiltonians.tV(1, z, g)
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
