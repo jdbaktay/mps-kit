@@ -529,7 +529,7 @@ if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
 
 if model == 'tV':
-    h = hamiltonians.tV(x, y, z)
+    h = hamiltonians.tV(1, z, g)
 
 if d == 2:
     sx = np.array([[0, 1],[1, 0]]) # gets 1/2
@@ -610,7 +610,6 @@ density = calc_expectations(AL, AR, C, n)
 print('density', density)
 
 # plt.plot(spla.svdvals(C), 'x', label='Schmidt vals')
-# plt.title('s=1/2, %s, z=%.2f, D=%i ' % params)
 # plt.grid()
 # plt.legend()
 # plt.yscale('log')
@@ -632,20 +631,20 @@ vals = stats.linregress(qs[:16], sk[:16])
 print('K = ', (2 * np.pi * vals.slope))
 print('R = ', vals.rvalue)
 
-path = ''    # '/Users/joshuabaktay/Desktop/code/vumps'
+path = '/Users/joshuabaktay/Desktop/local data/states'
 
-params = (model, z, D)
+params = (model, x, y, z, g, D)
 
-filename = "%s_AL_%.2f_%03i_.txt" % params
+filename = "%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
 with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in AL:
         np.savetxt(outfile, data_slice)
 
-filename = "%s_AR_%.2f_%03i_.txt" % params
+filename = "%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
 with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in AR:
         np.savetxt(outfile, data_slice)
 
-filename = "%s_C_%.2f_%03i_.txt" % params
+filename = "%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
 with open(os.path.join(path, filename), 'w') as outfile:
     np.savetxt(os.path.join(path, filename), C)
