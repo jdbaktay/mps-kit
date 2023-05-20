@@ -207,7 +207,7 @@ N = int(sys.argv[8])
 
 params = (model, z, D)
 
-path = ''    # '/Users/joshuabaktay/Desktop/local data/states'
+path = '/Users/joshuabaktay/Desktop/local data/states'
 
 filename = '%s_AL_%.2f_%03i_.txt' % params
 AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
@@ -258,7 +258,7 @@ lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 11)
+mom_vec = np.linspace(0, np.pi, 5)
 
 for p in mom_vec:
     print('p', p)
@@ -267,7 +267,7 @@ for p in mom_vec:
 
     excit_energy.append(w)
     excit_states.append(v)
-    print('excit. energy', w)
+    print('excit. energy', min(w))
 
 excit_energy = np.array(excit_energy)
 print('all excit. energy', excit_energy.shape)
@@ -277,13 +277,13 @@ print('energy max', excit_energy.max())
 excit_states = np.array(excit_states)
 print('all excit. states', excit_states.shape)
 
-filename = '%s_disp_%.2f_%03i_%05i_.dat' % (*params, N)
+filename = '%s_disp_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
 with open(os.path.join(path, filename), 'w') as outfile:
     np.savetxt(os.path.join(path, filename),
                np.column_stack((mom_vec, excit_energy))
                )
 
-filename = '%s_estate_%.2f_%03i_%05i_.dat' % (*params, N)
+filename = '%s_estate_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
 with open(os.path.join(path, filename), 'w') as outfile:
     for data_slice in excit_states:
         np.savetxt(outfile, data_slice)
