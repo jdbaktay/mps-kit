@@ -264,7 +264,7 @@ lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 5)
+mom_vec = np.linspace(0, np.pi, 21)
 
 for p in mom_vec:
     print('p', p)
