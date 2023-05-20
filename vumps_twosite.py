@@ -631,7 +631,7 @@ vals = stats.linregress(qs[:16], sk[:16])
 print('K = ', (2 * np.pi * vals.slope))
 print('R = ', vals.rvalue)
 
-path = '/Users/joshuabaktay/Desktop/local data/states'
+path = '' #'/Users/joshuabaktay/Desktop/local data/states'
 
 params = (model, x, y, z, g, D)
 
