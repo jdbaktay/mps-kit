@@ -236,8 +236,7 @@ if model == 'tV':
     if x == y:
         t = x
     else:
-        print('x and y not equal')
-        exit()
+        exit('x and y not equal')
 
     h = hamiltonians.tV(t, z, g)
 
