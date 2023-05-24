@@ -233,7 +233,13 @@ if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
 
 if model == 'tV':
-    h = hamiltonians.tV(1, z, g)
+    if x == y:
+        t = x
+    else:
+        print('x and y not equal')
+        exit()
+
+    h = hamiltonians.tV(t, z, g)
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -264,7 +270,7 @@ lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 21)
+mom_vec = np.linspace(-np.pi, np.pi, 41)
 
 for p in mom_vec:
     print('p', p)
