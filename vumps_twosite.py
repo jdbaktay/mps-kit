@@ -529,7 +529,13 @@ if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='two')
 
 if model == 'tV':
-    h = hamiltonians.tV(1, z, g)
+    if x == y:
+        t = x
+    else:
+        print('x and y not equal')
+        exit()
+
+    h = hamiltonians.tV(t, z, g)
 
 if d == 2:
     sx = np.array([[0, 1],[1, 0]]) # gets 1/2
