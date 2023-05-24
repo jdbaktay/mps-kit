@@ -118,15 +118,15 @@ def tVV2(t, V, V2, mu):
           )
    return tVV2
 
-# def tt2tc(t, t2, tc):
-#    tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-#            + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
-#            + (t2 / 2) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
-#            + (tc / 4) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
-#            + (g / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
-#                       + np.kron(np.kron(si, si), sz))
-#            )
-#    return tt2tc
+def tt2tc(t, t2, tc, mu):
+   tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
+          + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
+          + (t2 / 2) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
+          + (tc / 4) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
+          + (mu / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
+                      + np.kron(np.kron(si, si), sz))
+           )
+   return tt2tc
 
 
 
