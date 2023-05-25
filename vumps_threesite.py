@@ -1,4 +1,3 @@
-# for q in `jot 10 24 199`; do python3 -Walways -Werror ../vumps_threesite.py +2.0 0.0 +1.0 $q; done
 # python3 -Walways -Werror ../vumps_threesite.py +0.25 -0.5 +1.0 67
 # cd Desktop/code/vumps
 
@@ -547,7 +546,7 @@ if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='three')
 
 if model == 'tVV2':
-    h = hamiltonians.tVV2(1, x, y, z)
+    h = hamiltonians.tVV2(x, y, z, g) # Different input convention
 
 if d == 2:
     si = np.array([[1, 0],[0, 1]])
@@ -641,7 +640,7 @@ print('N for scf', N)
 qm, nk = calc_momentum(AL, AR, C, sp, sm, -sz, N)
 qs, sk = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
 
-plt.plot(qm / np.pi, nk, 'x')
+plt.plot(qm / np.pi, nk, 'o:', markersize=1.5)
 plt.show()
 
 plt.plot(qs / np.pi, sk, 'x')
