@@ -271,8 +271,8 @@ if model == 'halfXXZ':
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='three')
 
-if model =='tVV2':
-    h = hamiltonians.tVV2(1, x, y, z) # Different input convention
+if model == 'tVV2':
+    h = hamiltonians.tVV2(x, y, z, g) # Different input convention
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -300,7 +300,7 @@ lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(0, np.pi, 21)
+mom_vec = np.linspace(-np.pi, np.pi, 81)
 
 for p in mom_vec:
     print('p', p)
