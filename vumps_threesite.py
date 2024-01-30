@@ -1,17 +1,10 @@
-# python3 -Walways -Werror ../vumps_threesite.py +0.25 -0.5 +1.0 67
-# cd Desktop/code/vumps
-
-import ncon as nc
 import numpy as np
+import ncon as nc
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
-import matplotlib.pyplot as plt
 import functools
 import sys
 import os
-
-from scipy import stats
-
 import mps_tools
 import hamiltonians
 
@@ -103,6 +96,62 @@ def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     Hl = np.pad(Hl, pad_width=((0, delta_D), (0, delta_D)), mode='minimum')
     Hr = np.pad(Hr, pad_width=((0, delta_D), (0, delta_D)), mode='minimum')
     return np.array(AL), np.array(AR), C, Hl, Hr
+
+def calc_discard_weight(AL, AR, C, h, Hl, Hr):
+    def eff_ham(X):
+        X = X.reshape(d, D, d, D)
+
+        t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
+        t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
+        t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
+        t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
+        t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
+        H1 = t.reshape(D,d,d,D).transpose(1,0,2,3)
+
+        t = (AL.reshape(d * D, D) 
+                              @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D))
+        t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
+        t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+        t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
+        t = AL.conj().reshape(d * D, D).T @ t.reshape(d * D, d * d * D)
+        H2 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
+
+        t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
+        t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
+        t = t.reshape(d, d, d, D, D).transpose(0, 1, 3, 2, 4)
+        t = (t.reshape(d * d * D, d * D) 
+                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
+        H3 = t.reshape(d, d, D, D).transpose(0, 2, 1, 3)
+
+        t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
+        t = (t.reshape(d * D * d * d, D) 
+                                @ AR.transpose(1, 0, 2).reshape(D, d * D))
+        t = t.reshape(d * D, d, d, d, D).transpose(0, 4, 1, 2, 3)
+        t = t.reshape(d * D * D, d**3) @ h.reshape(d**3, d**3).T
+        t = t.reshape(d * D, D, d**2, d).transpose(0, 2, 3, 1)
+        t = (t.reshape(d * D * d * d, d * D) 
+                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
+        t = (t.reshape(d * D * d, d * D) 
+                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
+        H4 = t.reshape(d, D, d, D)
+
+        t = Hl @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D)
+        H5 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
+
+        t = X.reshape(d * D * d, D) @ Hr
+        H6 = t.reshape(d, D, d, D)
+        return (H1 + H2 + H3 + H4 + H5 + H6).ravel()
+
+    two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
+
+    H = spspla.LinearOperator((d * D * d * D, d * D * d * D), matvec=eff_ham)
+
+    w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
+
+    s = spla.svdvals(v[:, 0].reshape(d * D, d * D))
+
+    return sum(ss**2 for ss in s[D:])
 
 def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     tensors = [AL, AL, AL, h, AL.conj(), AL.conj(), AL.conj()]
@@ -278,210 +327,6 @@ def vumps(AL, AR, C, h, Hl, Hr, ep):
     epl, epr, AL, AR = calc_new_A(AL, AR, AC, C)
     return AL, AR, C, Hl, Hr, e, epl, epr
 
-def calc_discard_weight(AL, AR, C, h, Hl, Hr):
-    def eff_ham(X):
-        X = X.reshape(d, D, d, D)
-
-        t = AL.transpose(1,0,2).reshape(D*d,D)@X.transpose(1,0,2,3).reshape(D,d*d*D)
-        t = AL.transpose(1,0,2).reshape(D*d,D)@t.reshape(D,d*d*d*D)
-        t = h.reshape(d**3,d**3)@t.reshape(D,d**3,d*D).transpose(1,0,2).reshape(d**3,D*d*D)
-        t = AL.conj().transpose(2,0,1).reshape(D,d*D)@t.reshape(d,d**2,D,d*D).transpose(0,2,1,3).reshape(d*D,d*d*d*D)
-        t = AL.conj().transpose(2,1,0).reshape(D,D*d)@t.reshape(D*d,d*d*D)
-        H1 = t.reshape(D,d,d,D).transpose(1,0,2,3)
-
-        t = (AL.reshape(d * D, D) 
-                              @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D))
-        t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
-        t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
-        t = t.reshape(d, d, d, D, D).transpose(0, 3, 1, 2, 4)
-        t = AL.conj().reshape(d * D, D).T @ t.reshape(d * D, d * d * D)
-        H2 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
-
-        t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
-        t = t.reshape(d, D, d, d, D).transpose(0, 2, 3, 1, 4)
-        t = h.reshape(d**3, d**3) @ t.reshape(d**3, D * D)
-        t = t.reshape(d, d, d, D, D).transpose(0, 1, 3, 2, 4)
-        t = (t.reshape(d * d * D, d * D) 
-                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
-        H3 = t.reshape(d, d, D, D).transpose(0, 2, 1, 3)
-
-        t = X.reshape(d * D * d, D) @ AR.transpose(1, 0, 2).reshape(D, d * D)
-        t = (t.reshape(d * D * d * d, D) 
-                                @ AR.transpose(1, 0, 2).reshape(D, d * D))
-        t = t.reshape(d * D, d, d, d, D).transpose(0, 4, 1, 2, 3)
-        t = t.reshape(d * D * D, d**3) @ h.reshape(d**3, d**3).T
-        t = t.reshape(d * D, D, d**2, d).transpose(0, 2, 3, 1)
-        t = (t.reshape(d * D * d * d, d * D) 
-                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
-        t = (t.reshape(d * D * d, d * D) 
-                            @ AR.conj().transpose(0, 2, 1).reshape(d * D, D))
-        H4 = t.reshape(d, D, d, D)
-
-        t = Hl @ X.transpose(1, 0, 2, 3).reshape(D, d * d * D)
-        H5 = t.reshape(D, d, d, D).transpose(1, 0, 2, 3)
-
-        t = X.reshape(d * D * d, D) @ Hr
-        H6 = t.reshape(d, D, d, D)
-        return (H1 + H2 + H3 + H4 + H5 + H6).ravel()
-
-    two_site = nc.ncon([AL, C, AR], [(-1, -2, 1), (1, 2), (-3, 2, -4)])
-
-    H = spspla.LinearOperator((d * D * d * D, d * D * d * D), matvec=eff_ham)
-
-    w, v = spspla.eigs(H, k=1, which='SR', v0=two_site.ravel(), tol=1e-12, return_eigenvectors=True)
-
-    s = spla.svdvals(v[:, 0].reshape(d * D, d * D))
-
-    return sum(ss**2 for ss in s[D:])
-
-def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
-    stat_struc_fact = []
-
-    AC = np.tensordot(AL, C, axes=(2,0))
-
-    q = np.linspace(0, 1, N) * np.pi
-
-    o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-
-    tensors = [AC, o1, o2, AC.conj()]
-    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
-    contord = [1,2,3,4,5]
-    s1 = nc.ncon(tensors, indices, contord)
-    print('s --> s1', s1)
-
-    def left(X,o,Y):
-        indices = [(2,1,-2), (3,2), (3,1,-1)]
-        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
-
-    def right(X,o,Y):
-        indices = [(2,-1,1), (3,2), (3,-2,1)]
-        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
-
-    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
-    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
-
-    def left_env(X):
-        X = X.reshape(D, D)
-
-        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
-        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t.reshape(D * d, D)
-        return (X - np.exp(-1.0j * p) * XT).ravel()
-
-    def right_env(X):
-        X = X.reshape(D, D)
-
-        t = AL.reshape(d * D, D) @ X
-        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
-        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
-        return (X - np.exp(+1.0j * p) * XT).ravel()
-
-    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
-
-    for p in q:
-        print('s(', p, ')')
-        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
-        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
-
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), 
-                             x0=L1.ravel(), tol=10**-12, atol=10**-12
-                             )
-
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), 
-                             x0=R1.ravel(), tol=10**-12, atol=10**-12
-                             )
-
-        L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
-
-        s2 = np.exp(-1.0j*p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
-        s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
-
-        s = s1 + s2 + s3
-
-        stat_struc_fact.append(s.real)
-    return q, np.array(stat_struc_fact)
-
-def calc_momentum(AL, AR, C, o1, o2, o3, N):
-    momentum = []
-
-    AC = np.tensordot(AL, C, axes=(2,0))
-
-    tensors = [AC, o2, o1, AC.conj()]
-    indices = [(3, 1, 2), (4, 3), (5, 4), (5, 1, 2)]
-    contord = [1, 2, 3, 4, 5]
-    s1 = nc.ncon(tensors, indices, contord)
-    print('n --> s1', s1)
-
-    filling = s1.real
-    q = np.concatenate((np.linspace(0, filling, int(np.floor(N * filling)), endpoint=False),
-                        np.linspace(filling, 1, N - int(np.floor(N * filling))))) * np.pi
-
-    def left(X,o,Y):
-        indices = [(2,1,-2), (3,2), (3,1,-1)]
-        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
-
-    def right(X,o,Y):
-        indices = [(2,-1,1), (3,2), (3,-2,1)]
-        return nc.ncon([X, o, Y.conj()], indices, [1,2,3])
-
-    s2l, s2r = left(AC, o1, AL), right(AR, o2, AC)
-    s3l, s3r = left(AL, o2, AC), right(AC, o1, AR)
-
-    def left_env(X):
-        X = X.reshape(D, D)
-
-        t = X @ AR.transpose(1, 0, 2).reshape(D, d * D)
-        t = o3 @ t.reshape(D, d, D).transpose(1, 0, 2).reshape(d, D * D)
-        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D * d, D)
-        XT = AL.conj().transpose(2, 1, 0).reshape(D, D * d) @ t
-        return (X - np.exp(-1.0j * p) * XT).ravel()
-
-    def right_env(X):
-        X = X.reshape(D,D)
-
-        t = AL.reshape(d * D, D) @ X
-        t = o3 @ t.reshape(d, D * D)
-        t = t.reshape(d, D, D).transpose(1, 0, 2).reshape(D, d * D)
-        XT = t @ AR.conj().transpose(0, 2, 1).reshape(d * D, D)
-        return (X - np.exp(+1.0j * p) * XT).ravel()
-
-    L1, R1 = np.random.rand(D, D) - .5, np.random.rand(D, D) - .5
-
-    for p in q:
-        print('n(', p, ')')
-        left_env_op = spspla.LinearOperator((D * D, D * D), matvec=left_env)
-        right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
-
-        L1, _ = spspla.gmres(left_env_op, s2l.ravel(), 
-                             x0=L1.ravel(), tol=10**-12, atol=10**-12
-                             )
-
-        R1, _ = spspla.gmres(right_env_op, s3r.ravel(), 
-                             x0=R1.ravel(), tol=10**-12, atol=10**-12
-                             )
-
-        L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
-
-        s2 = np.exp(-1.0j*p) * np.tensordot(L1, s2r, axes=([1,0], [0,1]))
-        s3 = np.exp(+1.0j*p) * np.tensordot(s3l, R1, axes=([1,0], [0,1]))
-
-        s = s1 + s2 + s3
-
-        momentum.append(s.real)
-    return q, np.array(momentum)
-
-def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
-    k_left, k_right = k0 - dk, k0 + dk
-    mesh = np.concatenate((
-            np.linspace(0.0,     k_left,  npts_left, endpoint=False),
-            np.linspace(k_left,  k_right, npts_mid,  endpoint=False),
-            np.linspace(k_right, 1.0,     npts_right)
-            ))
-
-    test, step = np.linspace(k_left,  k_right, npts_mid, endpoint=False, retstep=True)
-    print('step', step)
-    return mesh
-
 def calc_entent(C):
     s = spla.svdvals(C)
 
@@ -496,13 +341,18 @@ def calc_fidelity(X, Y):
     evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
     return np.max(np.abs(evals))
 
-def calc_correlation_length(A):
-    E = nc.ncon([A, A.conj()],[[1, -1, -3], [1, -2, -4]]).reshape(D * D, D * D)
-    evals = spspla.eigs(E, k=4, which='LM', return_eigenvectors=False)
-    return -1/np.log(np.abs(evals[np.argmax(evals) - 1]))
+def nonuniform_mesh(npts_left, npts_mid, npts_right, k0, dk):
+    k_left, k_right = k0 - dk, k0 + dk
+    mesh = np.concatenate((
+            np.linspace(0.0,     k_left,  npts_left, endpoint=False),
+            np.linspace(k_left,  k_right, npts_mid,  endpoint=False),
+            np.linspace(k_right, 1.0,     npts_right)
+            ))
+
+    test, step = np.linspace(k_left,  k_right, npts_mid, endpoint=False, retstep=True)
+    return mesh
 
 def my_corr_length(A, X0, tol):
-    '''NEED TO SAVE ALL THREE EIGENVALUES TO DO FES.'''
     def left_transfer_op(X):
         tensors = [A, X.reshape(D, D), A.conj()]
         indices = [(1, 2, -2), (3, 2), (1, 3, -1)]
@@ -510,10 +360,11 @@ def my_corr_length(A, X0, tol):
         return nc.ncon(tensors,indices,contord).ravel()
 
     E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-    # k must be LARGER THAN OR EQUAL TO 2 so return statement makes sense
-    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, return_eigenvectors=False)
-    print('argmax', np.argmax(evals), evals)
-    return -1.0 / np.log(np.abs(evals[-2]))
+
+    # k must be LARGER THAN OR EQUAL TO 2
+    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, 
+                                return_eigenvectors=False)
+    return -1.0 / np.log(np.abs(evals[-2])), evals
 
 def calc_expectations(AL, AR, C, O):
     AC = np.tensordot(AL, C, axes=(2,0))
@@ -533,11 +384,18 @@ energy, error = [], []
 
 count, tol, stol, ep = 0, 1e-12, 1e-12, 1e-2
 
-model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
-x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+Dmax, delta_D = 0, 0
+
+model = str(sys.argv[1])
+d = int(sys.argv[2])
+D = int(sys.argv[3]) 
+x = float(sys.argv[4]) 
+y = float(sys.argv[5]) 
+z = float(sys.argv[6])
 g = float(sys.argv[7])
 
-Dmax, delta_D = 0, 0
+params = (model, x, y, z, g, D)
+print('input params', params)
 
 if model == 'halfXXZ':
     h = hamiltonians.XYZ_half(x, y, z, g, size='three')
@@ -547,6 +405,18 @@ if model == 'oneXXZ':
 
 if model == 'tVV2':
     h = hamiltonians.tVV2(x, y, z, g) # Different input convention
+
+if model == 'tt2V2tc':
+    h = hamiltonians.tt2V2tc(1, x, y, z, g)
+
+if model == 'tt2Vtc':
+    h = hamiltonians.tt2Vtc(1, x, y, z, g)
+
+if model == 'symtt2Vtc':
+    h = hamiltonians.symtt2Vtc(1, x, y, z, g)
+
+if model == 'hirr':
+    h = hamiltonians.hirr(x, y, z, g)
 
 if d == 2:
     si = np.array([[1, 0],[0, 1]])
@@ -614,7 +484,6 @@ while (ep > tol or D < Dmax) and count < 5000:
 
 print('final AL', AL.shape)
 print('final AR', AR.shape)
-mps_tools.checks(AL, AR, C)
 
 correlation_length = my_corr_length(AL, C, tol/100)
 print('correlation length', correlation_length)
@@ -628,58 +497,7 @@ print('discarded weight', disc_weight)
 density = calc_expectations(AL, AR, C, n)
 print('density', density)
 
-# plt.plot(spla.svdvals(C), 'x', label='Schmidt vals')
-# plt.grid()
-# plt.legend()
-# plt.yscale('log')
-# plt.show()
+path = ''
 
-N = int(np.floor(correlation_length))
-print('N for scf', N)
-
-qm, nk = calc_momentum(AL, AR, C, sp, sm, -sz, N)
-qs, sk = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
-
-plt.plot(qm / np.pi, nk, 'o:', markersize=1.5)
-plt.show()
-
-plt.plot(qs / np.pi, sk, 'x')
-plt.show()
-
-vals = stats.linregress(qs[:16], sk[:16])
-print('K = ', (2 * np.pi * vals.slope))
-print('R = ', vals.rvalue)
-
-path = '' #'/Users/joshuabaktay/Desktop/local data/states'
-
-params = (model, x, y, z, g, D)
-
-# filename = "%s_entent_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
-# np.savetxt(os.path.join(path, filename), np.array(vonneumann))
-
-# filename = "%s_evals_%.2f_%.2f_%.2f_%03i_.txt" % (model, V, V2, g, D)
-# np.savetxt(os.path.join(path, filename), np.array(evals))
-
-# filename = "%s_sk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
-# np.savetxt(os.path.join(path, filename), np.column_stack((qs, stat_struc_fact)), fmt='%s %s')
-
-# filename = "%s_nk_%.2f_%.2f_%.2f_%03i_.dat" % (model, V, V2, g, D)
-# np.savetxt(os.path.join(path, filename), np.column_stack((qm, momentum)), fmt='%s %s')
-
-filename = "%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
-with open(os.path.join(path, filename), 'w') as outfile:
-    for data_slice in AL:
-        np.savetxt(outfile, data_slice)
-
-filename = "%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
-with open(os.path.join(path, filename), 'w') as outfile:
-    for data_slice in AR:
-        np.savetxt(outfile, data_slice)
-
-filename = "%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt" % params
-with open(os.path.join(path, filename), 'w') as outfile:
-    np.savetxt(os.path.join(path, filename), C)
-
-
-
-
+filename = f'{model}_gs_{x}_{y:.1f}_{z:.1f}_{g}_{D:03}_'
+np.savez(os.path.join(path, filename), AL=AL, AR=AR, C=C)
