@@ -1,9 +1,5 @@
-# Hamiltonians
-
-import ncon as nc
 import numpy as np
-import scipy.linalg as spla
-import scipy.sparse.linalg as spspla
+import ncon as nc
 
 si_half = np.array([[1, 0],[0, 1]])
 sx_half = np.array([[0, 1],[1, 0]]) # gets 1/2
@@ -23,7 +19,9 @@ def TFI(J, g, size):
 
    if size == 'two':
       TFI = ((- J / 1) * np.kron(sx, sx) 
-           + (- g / 2) * (np.kron(sz, si) + np.kron(si, sz))
+           + (- g / 2) * (np.kron(sz, si) 
+                        + np.kron(si, sz)
+                        )
            )
    return TFI
 
@@ -118,22 +116,114 @@ def tVV2(t, V, V2, mu):
           )
    return tVV2
 
-def tt2tc(t, t2, tc, mu):
-   tt2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) + np.kron(np.kron(sy, sy), si))
-          + (-t / 4) * (np.kron(si, np.kron(sx, sx)) + np.kron(si, np.kron(sy, sy)))
-          + (t2 / 2) * (np.kron(sx, np.kron(sz, sx)) + np.kron(sy, np.kron(sz, sy)))
-          + (tc / 4) * (np.kron(sz, np.kron(sx, sx)) + np.kron(sz, np.kron(sy, sy)))
-          + (mu / 6) * (np.kron(sz, np.kron(si, si)) + np.kron(np.kron(si, sz), si)
-                      + np.kron(np.kron(si, si), sz))
+def tt2Vtc(t, t2, V, tc, mu):
+   si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
+
+   tt2Vtc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
+                      + np.kron(np.kron(sy, sy), si)
+                      )
+
+         + (-t / 4) * (np.kron(si, np.kron(sx, sx)) 
+                     + np.kron(si, np.kron(sy, sy))
+                     )
+
+         + (t2 / 2) * (np.kron(sx, np.kron(sz, sx)) 
+                     + np.kron(sy, np.kron(sz, sy))
+                     )
+
+         + (V / 8) * np.kron(np.kron(sz, sz), si)
+         + (V / 8) * np.kron(si, np.kron(sz, sz))
+
+         + (tc / 4) * (np.kron(sz, np.kron(sx, sx))
+                     + np.kron(sz, np.kron(sy, sy))
+                     )
+
+         + (mu / 6) * (np.kron(sz, np.kron(si, si)) 
+                     + np.kron(np.kron(si, sz), si)
+                     + np.kron(np.kron(si, si), sz)
+                     )
+          )
+   return tt2Vtc
+
+def tt2V2tc(t, t2, V2, tc, mu):
+   si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
+
+   tt2V2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si)
+                      + np.kron(np.kron(sy, sy), si)
+                      )
+
+         + (-t / 4) * (np.kron(si, np.kron(sx, sx))
+                     + np.kron(si, np.kron(sy, sy))
+                     )
+
+         + (t2 / 2) * (np.kron(sx, np.kron(sz, sx))
+                     + np.kron(sy, np.kron(sz, sy))
+                     )
+
+         + (V2 / 4) * np.kron(np.kron(sz, si), sz)
+
+         + (tc / 4) * (np.kron(sz, np.kron(sx, sx))
+                     + np.kron(sz, np.kron(sy, sy))
+                     )
+
+         + (mu / 6) * (np.kron(sz, np.kron(si, si))
+                     + np.kron(np.kron(si, sz), si)
+                     + np.kron(np.kron(si, si), sz)
+                     )
+          )
+   return tt2V2tc
+
+def symtt2Vtc(t, t2, V, tc, mu):
+   si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
+
+   symtt2Vtc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
+                      + np.kron(np.kron(sy, sy), si)
+                      )
+
+           + (-t / 4) * (np.kron(si, np.kron(sx, sx)) 
+                       + np.kron(si, np.kron(sy, sy))
+                       )
+
+           + (t2 / 2) * (np.kron(sx, np.kron(sz, sx))
+                       + np.kron(sy, np.kron(sz, sy))
+                       )
+
+           + (V / 8) * np.kron(np.kron(sz, sz), si)
+           + (V / 8) * np.kron(si, np.kron(sz, sz))
+
+           + (-tc / 4) * (np.kron(np.kron(sx, si), sx) 
+                        + np.kron(np.kron(sy, si), sy)
+                        ) 
+
+           + (mu / 6) * (np.kron(sz, np.kron(si, si)) 
+                       + np.kron(np.kron(si, sz), si)
+                       + np.kron(np.kron(si, si), sz)
+                       )
            )
-   return tt2tc
+   return symtt2Vtc
 
+def hirr(t, t2, V, mu):
+   si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
 
+   hirr = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
+                     + np.kron(np.kron(sy, sy), si)
+                     )
 
+         + (-t / 4) * (np.kron(si, np.kron(sx, sx)) 
+                     + np.kron(si, np.kron(sy, sy))
+                     )
 
+         + (t2 / 2) * (np.kron(sx, np.kron(sz, sx))
+                     + np.kron(sy, np.kron(sz, sy))
+                     )
 
+         + (V / 8) * np.kron(np.kron(sz, sz), sz)
 
-
-
+         + (mu / 6) * (np.kron(sz, np.kron(si, si)) 
+                     + np.kron(np.kron(si, sz), si)
+                     + np.kron(np.kron(si, si), sz)
+                     )
+           )
+   return hirr
 
 
