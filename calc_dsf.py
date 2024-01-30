@@ -1,20 +1,16 @@
 import numpy as np
+import ncon as nc
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
-import matplotlib.pyplot as plt
-import ncon as nc
 import functools
-import os
 import sys
-import matplotlib.colors as colors
-from mps_tools import checks
+import os
 
-def lorentzian(x, x0, gamma):
-    return (1 / np.pi) * ((0.5 * gamma)/((x - x0)**2 + (0.5 * gamma)**2))
+from mps_tools import checks
 
 def calc_dsf(AL, AR, AC, 
              excit_energy, excit_states, 
-             mom_vec, freq_vec, gamma, O):
+             mom_vec, O):
 
     def right_env(X):
         X = X.reshape(D, D)
@@ -30,25 +26,16 @@ def calc_dsf(AL, AR, AC,
         else:
             return (X - np.exp(+1.0j * p) * XT).ravel()
 
-    print('<o>', nc.ncon([AC, O, AC.conj()], [[1, 3, 4], [2, 3], [1, 2, 4]]))
-
     O = (O 
          - nc.ncon([AC, O, AC.conj()], [[1, 3, 4], [2, 3], [1, 2, 4]]) 
            * np.eye(d)
            )
 
     dsf = []
-    for i in range(mom_vec.size):
-        p = mom_vec[i]
-        print('p', p)
-
-        dsf_p = np.zeros(freq_vec.size)
+    for i, p in enumerate(mom_vec):
         for j in range(excit_states.shape[2]):
             X = excit_states[i,:,j].reshape((d - 1) * D, D)
             B = np.tensordot(VL, X, axes=(2, 0))
-
-            # print('left gauge check', spla.norm(nc.ncon([B, AL.conj()], [(1, 2, -2), (1, 2, -1)])))
-            # print('left gauge check', spla.norm(nc.ncon([B, AC.conj()], [(1, 2, -2), (1, 2, -1)])))
 
             tensors = [B, AC.conj()]
             indices = [(-1, 2, 1), (-2, 2, 1)]
@@ -77,131 +64,92 @@ def calc_dsf(AL, AR, AC,
             contord = [4, 5, 3, 1, 2]
             t2 = nc.ncon(tensors, indices, contord)
 
-            spec_weight = np.abs(t1 + np.exp(+1j * p) * t2)
+            dsf.append(np.abs(t1 + np.exp(+1j * p) * t2))
+    return np.array(dsf).reshape(mom_vec.size, excit_states.shape[2])
 
-            # print('omega, s', excit_energy[i,j], spec_weight)
+def my_corr_length(A, X0, tol):
+    def left_transfer_op(X):
+        tensors = [A, X.reshape(D, D), A.conj()]
+        indices = [(1, 2, -2), (3, 2), (1, 3, -1)]
+        contord = [2, 3, 1]
+        return nc.ncon(tensors,indices,contord).ravel()
 
-            lorentz_j = (2 * np.pi 
-                         * lorentzian(freq_vec, excit_energy[i,j], gamma)
-                         * spec_weight**2
-                         )
+    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
 
-            dsf_p += lorentz_j
-        dsf.append(dsf_p)
-    return np.array(dsf).reshape(mom_vec.size, freq_vec.size).T
+    # k must be LARGER THAN OR EQUAL TO 2
+    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, 
+                                return_eigenvectors=False)
+    return -1.0 / np.log(np.abs(evals[-2])), evals
 
-############ Load data #############
+########################### Initialization #############################
 
 model = str(sys.argv[1])
-
 d = int(sys.argv[2])
 D = int(sys.argv[3])
-
-# params not needed
 x = float(sys.argv[4])
 y = float(sys.argv[5])
 z = float(sys.argv[6])
 g = float(sys.argv[7])
-
 N = int(sys.argv[8])
-gamma = float(sys.argv[9])
 
-params = (model, x, y, z, g, D)
+params = (model, x, y, z, g, D, N)
+print('input params', params)
 
-path = '' #'/Users/joshuabaktay/Desktop/local data/states'
+path = ''
 
-filename = '%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
-AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
-AL = AL.reshape(d, D, D).transpose(1, 0, 2)
+filename = f'{model}_gs_{x}_{y}_{z}_{g}_{D:03}_.npz'
+gs_mps = np.load(os.path.join(path, filename))
 
-filename = '%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
-AR = np.loadtxt(os.path.join(path, filename), dtype=complex)
-AR = AR.reshape(d, D, D).transpose(1, 0, 2)
+# transpose needed for change to easier index conventions
+AL = gs_mps['AL'].transpose(1, 0, 2)
+AR = gs_mps['AR'].transpose(1, 0, 2)
+C = gs_mps['C']
 
-filename = '%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
-C = np.loadtxt(os.path.join(path, filename), dtype=complex)
-C = C.reshape(D, D)
+path = ''
 
-filename = '%s_disp_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
-disp = np.loadtxt(os.path.join(path, filename))
-print(filename)
+filename = f'{model}_excits_{x}_{y}_{z}_{g}_{D:03}_{N:05}_.npz'
+excits = np.load(os.path.join(path, filename))
 
-mom_vec = disp[:, 0]
-excit_energy  = disp[:, 1:]
-
-print('excit_energy', excit_energy.shape)
-print('excit_energy min', excit_energy.min())
-print('excit_energy max', excit_energy.max())
-
-filename = '%s_estate_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
-excit_states = np.loadtxt(os.path.join(path, filename), dtype=complex)
-excit_states = excit_states.reshape(excit_energy.shape[0], 
-                                    (d - 1) * D**2, 
-                                    excit_energy.shape[1]
-                                    )
-
-print('excit_states', excit_states.shape)
-print(filename)
-
-checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
+mom_vec = excits['mom']
+excit_energy = excits['evals']
+excit_states = excits['estates']
 
 if d == 2:
-    sx = np.array([[0, 1],[1, 0]]) # gets 1/2
-    sy = np.array([[0, -1j],[1j, 0]]) # gets 1/2
-    sz = np.array([[1, 0],[0, -1]]) # gets 1/2
+    sx = np.array([[0, 1],[1, 0]])
+    sy = np.array([[0, -1j],[1j, 0]])
+    sz = np.array([[1, 0],[0, -1]])
 
 if d == 3:
-    sx = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]) # gets 1/sqrt2
-    sy = np.array([[0, -1j, 0], [1j, 0, -1j], [0, 1j, 0]]) # gets 1/sqrt2
+    sx = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]) 
+    sy = np.array([[0, -1j, 0], [1j, 0, -1j], [0, 1j, 0]])
     sz = np.array([[1, 0, 0], [0, 0, 0], [0, 0, -1]])
 
 sp = 0.5 * (sx + 1.0j * sy)
 sm = 0.5 * (sx - 1.0j * sy)
 n = 0.5 * (sz + np.eye(d))
 
-############ Precompute steps ############
+######################### Compute dsf ##################################
 
 VL = spla.null_space(AL.conj().reshape(D * d, D).T)
 VL = VL.reshape(D, d, (d - 1) * D)
 
-freq_min = excit_energy.min() - (3 * gamma)
-freq_max = excit_energy.max() + (3 * gamma)
-
-num = int(np.ceil(5 * ((freq_max - freq_min) / gamma)))
-
-freq_vec = np.linspace(freq_min, freq_max, num)
-
-print('gamma', gamma)
-print('freq vec size', freq_vec.size)
-print('delta omega', freq_vec[1] - freq_vec[0])
-
 dsf = calc_dsf(AL, AR, np.tensordot(AL, C, axes=(2, 0)), 
                excit_energy, excit_states, 
-               mom_vec, freq_vec, gamma, sz
+               mom_vec, n
                )
 
-print(dsf.shape)
+print('dsf:', dsf.shape)
 
-fig, ax = plt.subplots()
-A, B = np.meshgrid(mom_vec / np.pi, freq_vec)
+_, corrlens = my_corr_length(AL.transpose(1, 0 ,2), C, 1e-14)
 
-Z = dsf
+path = ''
 
-print(Z.min(), Z.max())
+filename = f'{model}_specweights_{x}_{y}_{z}_{g}_{D:03}_{N:05}_.npz'
+np.savez(os.path.join(path, filename), mom=mom_vec, 
+                                       evals=excit_energy, 
+                                       dsf=dsf, 
+                                       corrlens=corrlens
+                                       )
 
-Z_min, Z_max = Z.min(), Z.max()
-Z = (Z - Z_min) / (Z_max - Z_min)
 
-print(Z.min(), Z.max())
 
-plot = ax.contourf(A, B, Z, levels=100)
-
-cbar = fig.colorbar(plot, format='%.3f')
-cbar.ax.set_ylabel('S(q, \u03C9)')
-ax.set_xlabel('q')
-ax.set_ylabel('\u03C9')
-plt.title('D='+str(D)+', gamma='+str(gamma)+', N='+str(N))
-plt.show()
-
-filename = '%s_dsf_%.2f_%.2f_%.2f_%.2f_%03i_%05i_%.2f_.txt' % (*params, N, gamma)
-np.savetxt(filename, np.column_stack((freq_vec, dsf)))
