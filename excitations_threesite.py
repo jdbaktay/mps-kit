@@ -1,15 +1,11 @@
-# Single-particle excitations
-
 import numpy as np
+import ncon as nc
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
-import matplotlib.pyplot as plt
-import ncon as nc
 import functools
 import sys
 import os
 
-# My scripts
 import hamiltonians
 from mps_tools import checks, HeffTerms_three, fixed_points
 
@@ -238,30 +234,32 @@ def gs_energy(AL, AR, C, h):
     return nc.ncon(tensors, indices, contord)
 
 ########################### Initialization #############################
+
 excit_energy, excit_states = [], []
 
 tol = 1e-12
 
-model, d, D = str(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
-x, y, z = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+model = str(sys.argv[1])
+d = int(sys.argv[2])
+D = int(sys.argv[3])
+x = float(sys.argv[4])
+y = float(sys.argv[5])
+z = float(sys.argv[6])
 g = float(sys.argv[7])
 N = int(sys.argv[8])
 
-params = (model, x, y, z, g, D)
+params = (model, x, y, z, g, D, N)
+print('input params', params)
 
-path = '' #'/Users/joshuabaktay/Desktop/local data/states'
+path = ''
 
-filename = '%s_AL_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
-AL = np.loadtxt(os.path.join(path, filename), dtype=complex)
-AL = AL.reshape(d, D, D).transpose(1, 0, 2)
+filename = f'{model}_gs_{x}_{y}_{z}_{g}_{D:03}_.npz'
+gs = np.load(os.path.join(path, filename))
 
-filename = '%s_AR_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
-AR = np.loadtxt(os.path.join(path, filename), dtype=complex)
-AR = AR.reshape(d, D, D).transpose(1, 0, 2)
-
-filename = '%s_C_%.2f_%.2f_%.2f_%.2f_%03i_.txt' % params
-C = np.loadtxt(os.path.join(path, filename), dtype=complex)
-C = C.reshape(D, D)
+# transpose needed for change to easier index conventions
+AL = gs['AL'].transpose(1, 0, 2)
+AR = gs['AR'].transpose(1, 0, 2)
+C = gs['C']
 
 Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
@@ -271,18 +269,30 @@ if model == 'halfXXZ':
 if model == 'oneXXZ':
     h = hamiltonians.XYZ_one(x, y, z, size='three')
 
-if model == 'tVV2':
+if model =='tVV2':
     h = hamiltonians.tVV2(x, y, z, g) # Different input convention
+
+if model == 'tt2Vtc':
+    h = hamiltonians.tt2Vtc(1, x, y, z, g)
+
+if model == 'tt2V2tc':
+    h = hamiltonians.tt2V2tc(1, x, y, z, g)
+
+if model == 'symtt2Vtc':
+    h = hamiltonians.symtt2Vtc(1, x, y, z, g)
+
+if model == 'hirr':
+    h = hamiltonians.hirr(x, y, z, g)
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
 
 ######################### Pre-compute steps ############################
+
 Lh, Rh, _ = HeffTerms_three(AL, AR, C, Lh, Rh, h, tol)
 
 h -= np.real(gs_energy(AL, AR, C, h)) * np.eye(d**3)
 h = h.reshape(d, d, d, d, d, d) 
-print('reg. gse', gs_energy(AL, AR, C, h))
 
 VL = spla.null_space(AL.conj().reshape(D * d, D).T)
 VL = VL.reshape(D, d, (d - 1) * D)
@@ -300,11 +310,14 @@ lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
-mom_vec = np.linspace(-np.pi, np.pi, 81)
+
+k = float(sys.argv[9])
+mom_vec = np.array([k]) * np.pi
 
 for p in mom_vec:
     print('p', p)
-    guess = v[:, 0] if p > 0 else None
+    # guess = v[:, 0] if p > 0 else None
+    guess = None 
     w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=guess)
 
     excit_energy.append(w)
@@ -312,28 +325,15 @@ for p in mom_vec:
     print('excit. energy', min(w))
 
 excit_energy = np.array(excit_energy)
-print('all excit. energy', excit_energy.shape)
-print('energy min', excit_energy.min())
-print('energy max', excit_energy.max())
+print('excit. energy', excit_energy.shape)
 
 excit_states = np.array(excit_states)
-print('all excit. states', excit_states.shape)
+print('excit. states', excit_states.shape)
 
-filename = '%s_disp_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
-with open(os.path.join(path, filename), 'w') as outfile:
-    np.savetxt(os.path.join(path, filename),
-               np.column_stack((mom_vec, excit_energy))
-               )
+path = ''
 
-filename = '%s_estate_%.2f_%.2f_%.2f_%.2f_%03i_%05i_.dat' % (*params, N)
-with open(os.path.join(path, filename), 'w') as outfile:
-    for data_slice in excit_states:
-        np.savetxt(outfile, data_slice)
-
-
-
-
-
-
-
-
+filename = f'{model}_excits_{x}_{y}_{z}_{g}_{D:03}_{N:05}_{k:.3f}_'
+np.savez(os.path.join(path, filename), mom=mom_vec, 
+                                       evals=excit_energy, 
+                                       estates=excit_states
+                                       )
