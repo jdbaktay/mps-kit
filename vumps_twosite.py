@@ -7,6 +7,7 @@ import sys
 import os
 import hamiltonians
 import mps_tools
+import inspect
 
 def dynamic_expansion(AL, AR, C, Hl, Hr, h, delta_D):
     Al = AL.reshape(d * D, D)
@@ -379,17 +380,10 @@ g = float(sys.argv[7])
 params = (model, x, y, z, g, D)
 print('input params', params)
 
-if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, g, size='two')
+hamiltonian_dict = {name: obj for name, obj 
+                    in inspect.getmembers(hamiltonians, inspect.isfunction)}
 
-if model == 'TFI':
-    h = hamiltonians.TFI(x, g, size='two')
-
-if model == 'oneXXZ':
-    h = hamiltonians.XYZ_one(x, y, z, size='two')
-
-if model == 'tV':
-    h = hamiltonians.tV(1, z, g)
+h = hamiltonian_dict[model](x, y, z, g).reshape(d, d, d, d)
 
 if d == 2:
     sx = np.array([[0, 1],[1, 0]]) 
@@ -404,8 +398,6 @@ if d == 3:
 sp = 0.5 * (sx + 1.0j * sy)
 sm = 0.5 * (sx - 1.0j * sy)
 n = 0.5 * (sz + np.eye(d))
-
-h = h.reshape(d, d, d, d)
 
 A = (np.random.rand(d, D, D) - 0.5) + 1j * (np.random.rand(d, D, D) - 0.5)
 C = np.random.rand(D, D) - 0.5
