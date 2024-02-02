@@ -5,6 +5,7 @@ import scipy.sparse.linalg as spspla
 import functools
 import sys
 import os
+import inspect
 
 import hamiltonians
 from mps_tools import checks, HeffTerms_two
@@ -221,17 +222,10 @@ C = gs['C']
 
 Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
-if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, g, size='two')
+hamiltonian_dict = {name: obj for name, obj 
+                    in inspect.getmembers(hamiltonians, inspect.isfunction)}
 
-if model == 'TFI':
-    h = hamiltonians.TFI(x, g, size='two')
-
-if model == 'oneXXZ':
-    h = hamiltonians.XYZ_one(x, y, z, size='two')
-
-if model == 'tV':
-    h = hamiltonians.tV(1, z, g)
+h = hamiltonian_dict[model](x, y, z, g)
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -260,16 +254,12 @@ lfp_RL, rfp_RL = fixed_points(AR, AL)
 
 ######################### Compute excitations ##########################
 
-# k = float(sys.argv[9])
-# mom_vec = np.array([k]) * np.pi
-
-mom_vec = np.linspace(-1, 1, 41) * np.pi
+k = float(sys.argv[9])
+mom_vec = np.array([k]) * np.pi
 
 for p in mom_vec:
     print('p', p)
-    # guess = v[:, 0] if p > 0 else None
-    guess = None
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=guess)
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=None)
 
     excit_energy.append(w)
     excit_states.append(v)
@@ -283,8 +273,7 @@ print('excit. states', excit_states.shape)
 
 path = ''
  
-# filename = f'{model}_excits_{x}_{y}_{z}_{g}_{D:03}_{N:05}_{k:.3f}_'
-filename = f'{model}_excits_{x}_{y}_{z}_{g}_{D:03}_{N:05}_'
+filename = f'{model}_excits_{x}_{y}_{z}_{g}_{D:03}_{N:05}_{k:.3f}_'
 np.savez(os.path.join(path, filename), mom=mom_vec, 
                                        evals=excit_energy, 
                                        estates=excit_states
