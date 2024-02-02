@@ -5,6 +5,7 @@ import scipy.sparse.linalg as spspla
 import functools
 import sys
 import os
+import inspect
 
 import hamiltonians
 from mps_tools import checks, HeffTerms_three, fixed_points
@@ -263,26 +264,10 @@ C = gs['C']
 
 Lh, Rh = np.eye(D, dtype=AL.dtype), np.eye(D, dtype=AR.dtype)
 
-if model == 'halfXXZ':
-    h = hamiltonians.XYZ_half(x, y, z, g, size='three')
+hamiltonian_dict = {name: obj for name, obj 
+                    in inspect.getmembers(hamiltonians, inspect.isfunction)}
 
-if model == 'oneXXZ':
-    h = hamiltonians.XYZ_one(x, y, z, size='three')
-
-if model =='tVV2':
-    h = hamiltonians.tVV2(x, y, z, g) # Different input convention
-
-if model == 'tt2Vtc':
-    h = hamiltonians.tt2Vtc(1, x, y, z, g)
-
-if model == 'tt2V2tc':
-    h = hamiltonians.tt2V2tc(1, x, y, z, g)
-
-if model == 'symtt2Vtc':
-    h = hamiltonians.symtt2Vtc(1, x, y, z, g)
-
-if model == 'hirr':
-    h = hamiltonians.hirr(x, y, z, g)
+h = hamiltonian_dict[model](x, y, z, g)
 
 checks(AL.transpose(1, 0, 2), AR.transpose(1, 0, 2), C)
 print('gse', gs_energy(AL, AR, C, h))
@@ -302,9 +287,9 @@ print('null check 1',
       )
 
 print('null check 2',
-    spla.norm(nc.ncon([VL, VL.conj()], [(1, 2, -2), (1, 2, -1)])
+       spla.norm(nc.ncon([VL, VL.conj()], [(1, 2, -2), (1, 2, -1)])
                - np.eye(D * (d - 1)))
-    )
+       )
 
 lfp_LR, rfp_LR = fixed_points(AL, AR)
 lfp_RL, rfp_RL = fixed_points(AR, AL)
@@ -316,9 +301,7 @@ mom_vec = np.array([k]) * np.pi
 
 for p in mom_vec:
     print('p', p)
-    # guess = v[:, 0] if p > 0 else None
-    guess = None 
-    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=guess)
+    w, v = quasi_particle(AL, AR, C, Lh, Rh, h, p, N=N, guess=None)
 
     excit_energy.append(w)
     excit_states.append(v)
