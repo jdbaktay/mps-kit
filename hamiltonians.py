@@ -81,9 +81,14 @@ def XYZ_one(x, y, z, size):
          )
    return XYZ
 
-def tV(t, V, mu):
+def tV(x, y, V, mu):
    si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
-   
+
+   if x == y:
+      t = x
+   else:
+      exit('x and y must match')
+
    tV = ((-2 * t) * (1 / 4) * (np.kron(sx, sx) 
                              + np.kron(sy, sy)
                              )
@@ -116,7 +121,7 @@ def tVV2(t, V, V2, mu):
           )
    return tVV2
 
-def tt2Vtc(t, t2, V, tc, mu):
+def tt2Vtc(t2, V, tc, mu, t=1):
    si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
 
    tt2Vtc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
@@ -145,7 +150,7 @@ def tt2Vtc(t, t2, V, tc, mu):
           )
    return tt2Vtc
 
-def tt2V2tc(t, t2, V2, tc, mu):
+def tt2V2tc(t2, V2, tc, mu, t=1):
    si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
 
    tt2V2tc = ((-t / 4) * (np.kron(np.kron(sx, sx), si)
@@ -173,7 +178,7 @@ def tt2V2tc(t, t2, V2, tc, mu):
           )
    return tt2V2tc
 
-def symtt2Vtc(t, t2, V, tc, mu):
+def symtt2Vtc(t2, V, tc, mu, t=1):
    si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
 
    symtt2Vtc = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
