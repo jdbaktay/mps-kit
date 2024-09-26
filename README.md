@@ -5,8 +5,7 @@ This repository provides an implementation of Matrix Product States (MPS) method
 The code demonstrates how to write MPS methods from scratch (without pre-existing libraries beyond numpy/scipy), 
 making it a useful resource for those looking to understand the underlying mechanics of MPS algorithms.
 
-### Notice
-This code was not designed to be a public-use library. 
+This code was not designed as a public-use library. 
 The owner encourages the reader toward the many excellent libraries dedicated to tensor network methods.
 
 ## Main Contents
