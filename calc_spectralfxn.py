@@ -258,7 +258,7 @@ _, corrlens = my_corr_length(AL.transpose(1, 0, 2), C, 1e-14)
 
 path = ''
 
-filename = f'{model}_specweights_{x}_{y}_{z}_{g}_{D:03}_{N:05}_.npz'
+filename = f'{model}_specweights-sf_{x}_{y}_{z}_{g}_{D:03}_{N:05}_.npz'
 np.savez(os.path.join(path, filename), mom=mom_vec, 
                                        evals=excit_energy, 
                                        Ap=Ap, 
