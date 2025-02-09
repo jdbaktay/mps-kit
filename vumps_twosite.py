@@ -385,6 +385,7 @@ hamiltonian_dict = {name: obj for name, obj
 
 h = hamiltonian_dict[model](x, y, z, g).reshape(d, d, d, d)
 
+
 if d == 2:
     sx = np.array([[0, 1],[1, 0]]) 
     sy = np.array([[0, -1j],[1j, 0]]) 
