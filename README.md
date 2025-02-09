@@ -15,10 +15,10 @@ The owner encourages the reader toward the many excellent libraries dedicated to
 - Various supporting tools for the main algorithms and additional analysis.
 
 ## Usage Notes
-- Parameter input from command line follows this convention:
-  'python filename.py model_name local_dimension bond_dimension hamiltonian_param_1 hamiltonian_param_2 hamiltonian_param_3 chemical_potential'
+- Parameter input from command line follows this convention:  
+  `python filename.py model_name local_dimension bond_dimension hamiltonian_param_1 hamiltonian_param_2 hamiltonian_param_3 chemical_potential`
   which corresponds to the input conventions for the *fermion* hamiltonians in hamiltonians.py
-- For excitation files, add to the command line 'number_of_eigenvalues momentum_value'
+- For excitation files, add to the command line `number_of_eigenvalues momentum_value`
 - Because the excitation calculations are the most computationally expensive the parameter input and file output specifies a *single* momentum value to be used in HPC contexts. By comparison, the inputs/outputs of the dynamic correlations do *not* follow this convention.
 
 ## Associated Publications
