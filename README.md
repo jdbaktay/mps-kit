@@ -18,7 +18,7 @@ The owner encourages the reader toward the many excellent libraries dedicated to
 - Parameter input from command line follows this convention:  
   `python filename.py model_name local_dim bond_dim hamiltonian_param_1 hamiltonian_param_2 hamiltonian_param_3 chemical_potential`
   which corresponds to the input conventions for the *fermion* hamiltonians in hamiltonians.py (not the spin hamiltonians)
-  - To maintain the input convention, fermions models with more than 4 parameters have had nearest-neighbor hopping set to t=1 
+  - To maintain the input convention, fermion models with more than 4 parameters have had the nearest-neighbor hopping set to t=1 
 - For excitation files, add to the command line at the end `number_of_eigenvalues momentum_value`
 - Because the excitation calculations are the most computationally expensive the parameter input and file output specifies a *single* momentum value to be used in HPC contexts. By comparison, the inputs/outputs of the dynamic correlations do *not* follow this convention.
 
