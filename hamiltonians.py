@@ -11,17 +11,16 @@ sx_one = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]]) # gets 1/sqrt2
 sy_one = np.array([[0, -1j, 0], [1j, 0, -1j], [0, 1j, 0]]) # gets 1/sqrt2
 sz_one = np.array([[1, 0, 0], [0, 0, 0], [0, 0, -1]])
 
-def TFI(J, g, size):
+def TFI(J, g):
    si = si_half
    sx = sx_half
    sy = sy_half
    sz = sz_half
 
-   if size == 'two':
-      TFI = ((- J / 1) * np.kron(sx, sx) 
-           + (- g / 2) * (np.kron(sz, si) 
-                        + np.kron(si, sz)
-                        )
+   TFI = ((- J / 1) * np.kron(sz, sz) 
+           + (- g / 2) * (np.kron(sx, si) 
+                        + np.kron(si, sx)
+                        ) # sz and sx used to be swapped
            )
    return TFI
 
@@ -207,28 +206,28 @@ def symtt2Vtc(t2, V, tc, mu, t=1):
            )
    return symtt2Vtc
 
-def hirr(t, t2, V, mu):
+def t2V3(t, t2, V, mu):
    si, sx, sy, sz =  si_half, sx_half, sy_half, sz_half
 
-   hirr = ((-t / 4) * (np.kron(np.kron(sx, sx), si) 
-                     + np.kron(np.kron(sy, sy), si)
-                     )
+   H = ((-t / 4) * (np.kron(np.kron(sx, sx), si)
+                  + np.kron(np.kron(sy, sy), si)
+                  )
 
-         + (-t / 4) * (np.kron(si, np.kron(sx, sx)) 
-                     + np.kron(si, np.kron(sy, sy))
-                     )
+           + (-t / 4) * (np.kron(si, np.kron(sx, sx))
+                       + np.kron(si, np.kron(sy, sy))
+                       )
 
-         + (t2 / 2) * (np.kron(sx, np.kron(sz, sx))
-                     + np.kron(sy, np.kron(sz, sy))
-                     )
+           + (t2 / 2) * (np.kron(sx, np.kron(sz, sx))
+                       + np.kron(sy, np.kron(sz, sy))
+                       )
 
-         + (V / 8) * np.kron(np.kron(sz, sz), sz)
+           + (V / 8) * np.kron(np.kron(sz, sz), sz)
 
-         + (mu / 6) * (np.kron(sz, np.kron(si, si)) 
-                     + np.kron(np.kron(si, sz), si)
-                     + np.kron(np.kron(si, si), sz)
-                     )
+           + (mu / 6) * (np.kron(sz, np.kron(si, si))
+                       + np.kron(np.kron(si, sz), si)
+                       + np.kron(np.kron(si, si), sz)
+                       )
            )
-   return hirr
+   return H
 
 
