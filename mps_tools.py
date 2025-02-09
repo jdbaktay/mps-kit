@@ -133,11 +133,11 @@ def HeffTerms_two(AL, AR, C, Hl, Hr, h, ep):
     Or = spspla.LinearOperator((D**2, D**2), matvec=right_env)
 
     Hl, _ = spspla.gmres(Ol, hl.ravel(), 
-                         x0=Hl.ravel(), tol=ep/100, atol=ep/100
+                         x0=Hl.ravel(), rtol=ep/100, atol=ep/100
                          )
 
     Hr, _ = spspla.gmres(Or, hr.ravel(), 
-                         x0=Hr.ravel(), tol=ep/100, atol=ep/100
+                         x0=Hr.ravel(), rtol=ep/100, atol=ep/100
                          )
 
     Hl, Hr = Hl.reshape(D, D), Hr.reshape(D, D)
@@ -211,8 +211,8 @@ def HeffTerms_three(AL, AR, C, Hl, Hr, h, ep):
     Ol = spspla.LinearOperator((D**2,D**2), matvec=left_env)
     Or = spspla.LinearOperator((D**2,D**2), matvec=right_env)
 
-    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100, atol=ep/100)
-    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100, atol=ep/100)
+    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), rtol=ep/100, atol=ep/100)
+    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), rtol=ep/100, atol=ep/100)
 
     Hl, Hr = Hl.reshape(D,D), Hr.reshape(D,D)
     print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))

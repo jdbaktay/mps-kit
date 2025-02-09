@@ -204,8 +204,8 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     Ol = spspla.LinearOperator((D**2,D**2), matvec=left_env)
     Or = spspla.LinearOperator((D**2,D**2), matvec=right_env)
 
-    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), tol=ep/100, atol=ep/100)
-    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), tol=ep/100, atol=ep/100)
+    Hl, _ = spspla.gmres(Ol, hl.ravel(), x0=Hl.ravel(), rtol=ep/100, atol=ep/100)
+    Hr, _ = spspla.gmres(Or, hr.ravel(), x0=Hr.ravel(), rtol=ep/100, atol=ep/100)
 
     Hl, Hr = Hl.reshape(D,D), Hr.reshape(D,D)
     print('Hl == Hl+', spla.norm(Hl - Hl.T.conj()))
@@ -363,8 +363,7 @@ def my_corr_length(A, X0, tol):
     E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
 
     # k must be LARGER THAN OR EQUAL TO 2
-    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, 
-                                return_eigenvectors=False)
+    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, return_eigenvectors=False)
     return -1.0 / np.log(np.abs(evals[-2])), evals
 
 def calc_expectations(AL, AR, C, O):

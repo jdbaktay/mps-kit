@@ -190,11 +190,11 @@ def HeffTerms(AL, AR, C, h, Hl, Hr, ep):
     Or = spspla.LinearOperator((D**2, D**2), matvec=right_env)
 
     Hl, _ = spspla.gmres(Ol, hl.ravel(), 
-                         x0=Hl.ravel(), tol=ep/100, atol=ep/100
+                         x0=Hl.ravel(), rtol=ep/100, atol=ep/100
                          )
 
     Hr, _ = spspla.gmres(Or, hr.ravel(), 
-                         x0=Hr.ravel(), tol=ep/100, atol=ep/100
+                         x0=Hr.ravel(), rtol=ep/100, atol=ep/100
                          )
 
     Hl, Hr = Hl.reshape(D, D), Hr.reshape(D, D)

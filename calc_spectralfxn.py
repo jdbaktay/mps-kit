@@ -139,13 +139,13 @@ def calc_specfxn(AL, AR, AC,
 
             LB = spspla.gmres(left_env_op, left_vec.ravel(),
                                            x0=rand_init.ravel(), 
-                                           tol=1e-14, 
+                                           rtol=1e-14, 
                                            atol=1e-14
                                            )[0].reshape(D, D)
 
             RB = spspla.gmres(right_env_op, right_vec.ravel(), 
                                             x0=rand_init.ravel(), 
-                                            tol=1e-14, 
+                                            rtol=1e-14, 
                                             atol=1e-14
                                             )[0].reshape(D, D)
 

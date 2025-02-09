@@ -26,7 +26,7 @@ def left_vector_solver(O, p):
     v, _ = spspla.gmres(left_env_op, 
                         O.ravel(), 
                         x0=(np.random.rand(D, D) - 0.5).ravel(), 
-                        tol=tol, 
+                        rtol=tol, 
                         atol=tol
                         )
     return v.reshape(D, D)
@@ -47,7 +47,7 @@ def right_vector_solver(O, p):
     v, _ = spspla.gmres(right_env_op, 
                         O.ravel(), 
                         x0=(np.random.rand(D, D) - 0.5).ravel(), 
-                        tol=tol, 
+                        rtol=tol, 
                         atol=tol
                         )
     return v.reshape(D, D)

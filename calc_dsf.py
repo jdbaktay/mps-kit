@@ -50,7 +50,7 @@ def calc_dsf(AL, AR, AC,
 
             RB = spspla.gmres(right_env_op, right_vec.ravel(), 
                                             x0=rand_init.ravel(), 
-                                            tol=1e-14, 
+                                            rtol=1e-14, 
                                             atol=1e-14
                                             )[0].reshape(D, D)
 

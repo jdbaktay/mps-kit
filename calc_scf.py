@@ -61,11 +61,11 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
         L1, _ = spspla.gmres(left_env_op, s2l.ravel(),
-                             x0=L1.ravel(), tol=10**-12, atol=10**-12
+                             x0=L1.ravel(), rtol=10**-12, atol=10**-12
                              )
 
         R1, _ = spspla.gmres(right_env_op, s3r.ravel(),
-                             x0=R1.ravel(), tol=10**-12, atol=10**-12
+                             x0=R1.ravel(), rtol=10**-12, atol=10**-12
                              )
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
@@ -128,11 +128,11 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
         right_env_op = spspla.LinearOperator((D * D, D * D), matvec=right_env)
 
         L1, _ = spspla.gmres(left_env_op, s2l.ravel(),
-                             x0=L1.ravel(), tol=10**-12, atol=10**-12
+                             x0=L1.ravel(), rtol=10**-12, atol=10**-12
                              )
 
         R1, _ = spspla.gmres(right_env_op, s3r.ravel(),
-                             x0=R1.ravel(), tol=10**-12, atol=10**-12
+                             x0=R1.ravel(), rtol=10**-12, atol=10**-12
                              )
 
         L1, R1 = L1.reshape(D,D), R1.reshape(D,D)
