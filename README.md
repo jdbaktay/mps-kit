@@ -2,11 +2,9 @@
 
 This repository provides an implementation of Matrix Product States (MPS) methods from the ground up for the study of quantum many-body systems.
 
-The code demonstrates how to write MPS methods from scratch (without pre-existing libraries beyond numpy/scipy), 
-making it a useful resource for those looking to understand the underlying mechanics of MPS algorithms.
+The code demonstrates how to write MPS methods from scratch (without pre-existing libraries beyond numpy/scipy), chiefly useful for those looking to understand the underlying, fine-grained mechanics of MPS algorithms. 
 
-This code was not intended/designed as a public-use library. 
-The owner encourages the reader toward the many excellent libraries dedicated to tensor network methods.
+For those seeking a simpler, more pre-packaged experience, the owner encourages the reader toward the many excellent libraries dedicated to tensor network methods.
 
 ## Main Contents
 - VUMPS algorithm for calculating ground states, separated for two-site and three-site hamiltonians. See [here](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.97.045145) for details.
