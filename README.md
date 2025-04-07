@@ -1,6 +1,6 @@
 # MPS Kit
 
-This repository provides an implementation of Matrix Product States (MPS) methods from the ground up for the study of quantum many-body systems.
+This repository provides an implementation of Matrix Product States (MPS) methods from the ground up for the study of quantum many-body systems with novel extensions for fermions. 
 
 The code demonstrates how to write MPS methods from scratch (without pre-existing libraries beyond numpy/scipy), chiefly useful for those looking to understand the underlying, fine-grained mechanics of MPS algorithms. 
 
