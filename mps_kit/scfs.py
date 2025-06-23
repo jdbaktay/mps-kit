@@ -3,22 +3,28 @@ import ncon as nc
 import scipy.linalg as spla
 import scipy.sparse.linalg as spspla
 import functools
-import sys
-import os
 
-import mps_tools
-import hamiltonians
+from .mps_tools import calc_corr_length
 
-def calc_momentum(AL, AR, C, o1, o2, o3, N):
+def momentum_dist(AL, AR, C, o1, o2, o3):
+    d = AL.shape[1]
+    D = C.shape[0]
+
+    AL = AL.transpose(1, 0, 2)
+    AR = AR.transpose(1, 0, 2)
+
     momentum = []
 
-    AC = np.tensordot(AL, C, axes=(2,0))
+    AC = np.tensordot(AL, C, axes=(2, 0))
 
     tensors = [AC, o2, o1, AC.conj()]
-    indices = [(3, 1, 2), (4, 3), (5, 4), (5, 1, 2)]
-    contord = [1, 2, 3, 4, 5]
+    indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
+    contord = [1,2,3,4,5]
     s1 = nc.ncon(tensors, indices, contord)
     print('n --> s1', s1)
+
+    N = int(np.floor(calc_corr_length(AL, C, 1e-14)[0]))
+    print('N for n(k)', N)
 
     filling = s1.real
     q = np.concatenate((np.linspace(0, filling, int(np.floor(N * filling)), endpoint=False),
@@ -78,15 +84,24 @@ def calc_momentum(AL, AR, C, o1, o2, o3, N):
         momentum.append(s.real)
     return q, np.array(momentum)
 
-def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
+def stat_struc_fact(AL, AR, C, o1, o2, o3):
+    d = AL.shape[1]
+    D = C.shape[0]
+
+    AL = AL.transpose(1, 0, 2)
+    AR = AR.transpose(1, 0, 2)
+
     stat_struc_fact = []
+
+    N = int(np.floor(calc_corr_length(AL, C, 1e-14)[0]))
+    print('N for s(k)', N)
 
     AC = np.tensordot(AL, C, axes=(2,0))
 
     q = np.linspace(0, 1, N) * np.pi
 
-    o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
-    o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]])*np.eye(d)
+    o1 = o1 - nc.ncon([AC, o1, AC.conj()], [[3,1,4], [2,3], [2,1,4]]) * np.eye(d)
+    o2 = o2 - nc.ncon([AC, o2, AC.conj()], [[3,1,4], [2,3], [2,1,4]]) * np.eye(d)
 
     tensors = [AC, o1, o2, AC.conj()]
     indices = [(3,1,2), (4,3), (5,4), (5,1,2)]
@@ -144,80 +159,3 @@ def calc_stat_struc_fact(AL, AR, C, o1, o2, o3, N):
 
         stat_struc_fact.append(s.real)
     return q, np.array(stat_struc_fact)
-
-def my_corr_length(A, X0, tol):
-    def left_transfer_op(X):
-        tensors = [A, X.reshape(D, D), A.conj()]
-        indices = [(1, 2, -2), (3, 2), (1, 3, -1)]
-        contord = [2, 3, 1]
-        return nc.ncon(tensors,indices,contord).ravel()
-
-    E = spspla.LinearOperator((D * D, D * D), matvec=left_transfer_op)
-
-    # k must be LARGER THAN OR EQUAL TO 2
-    evals = spspla.eigs(E, k=4, which="LM", v0=X0, tol=tol, 
-                                return_eigenvectors=False
-                                )
-    return -1.0 / np.log(np.abs(evals[-2])), evals
-
-tol = stol = 1e-12
-
-model = str(sys.argv[1])
-d = int(sys.argv[2])
-D = int(sys.argv[3])
-x = float(sys.argv[4])
-y = float(sys.argv[5])
-z = float(sys.argv[6])
-g = float(sys.argv[7])
-
-if d == 2:
-    si = np.array([[1, 0],[0, 1]])
-    sx = np.array([[0, 1],[1, 0]])
-    sy = np.array([[0, -1j],[1j, 0]])
-    sz = np.array([[1, 0],[0, -1]])
-
-if d == 3:
-    si = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    sx = np.array([[0, 0, 0], [0, 0, -1j], [0, 1j, 0]])
-    sy = np.array([[0, 0, 1j], [0, 0, 0], [-1j, 0, 0]])
-    sz = np.array([[0, -1j, 0], [1j, 0, 0], [0, 0, 0]])
-
-sp = 0.5 * (sx + 1.0j * sy)
-sm = 0.5 * (sx - 1.0j * sy)
-n = 0.5 * (sz + np.eye(d))
-
-path = ''
-
-filename = f'{model}_gs_{x}_{y}_{z}_{g}_{D:03}_.npz'
-gs = np.load(os.path.join(path, filename))
-
-AL, AR, C = gs['AL'], gs['AR'], gs['C']
-
-correlation_length, evals = my_corr_length(AL, C, tol/100)
-print('correlation length', correlation_length)
-
-N = int(np.floor(correlation_length))
-print('N for scf', N)
-
-qm, nk = calc_momentum(AL, AR, C, sp, sm, -sz, N)
-qs, sk = calc_stat_struc_fact(AL, AR, C, n, n, None, N)
-
-path = ''
-
-filename = f'{model}_sk_{x}_{y}_{z}_{g}_{D:03}_'
-np.savez(os.path.join(path, filename), mom=qs, ssf=sk, corr_evals=evals)
-
-path = ''
-
-filename = f'{model}_nk_{x}_{y}_{z}_{g}_{D:03}_'
-np.savez(os.path.join(path, filename), mom=qm, nk=nk, corr_evals=evals)
-
-
-
-
-
-
-
-
-
-
