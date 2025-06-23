@@ -41,7 +41,7 @@ For those seeking a simpler, more pre-packaged experience, the owner encourages 
 
 ### Example
 
-To run a simulation with a fermion model:
+To run a simulation with the tVV2 fermion model with nearest-neighbor hopping t=x=1, nearest-neighbor interactions V=y=1, next-nearest-neighbor interactions V2=z=0 and chemical potential, mu=0:
 
 ```bash
 python run.py --model tVV2 --d 2 --D 5 --x 1.0 --y 1.0 --z 0.0 --mu 0.0
