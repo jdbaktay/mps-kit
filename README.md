@@ -36,7 +36,7 @@ For those seeking a simpler, more pre-packaged experience, the owner encourages 
 
 | Argument            | Type   | Description                                                    |
 |---------------------|--------|----------------------------------------------------------------|
-| `--percent_vals`    | `int`  | Percentage of total eigenvalues to retain (e.g., for truncation) |
+| `--percent_evals`    | `int`  | Percentage of total eigenvalues to retain (e.g., for truncation) |
 | `--out_dir`         | `str`  | Output directory to save results. Defaults to current working directory. |
 
 ### Example
@@ -45,6 +45,7 @@ To run a simulation with a fermion model:
 
 ```bash
 python run.py --model tVV2 --d 2 --D 5 --x 1.0 --y 1.0 --z 0.0 --mu 0.0
+```
 
 - Within `run.py`, we create a dictionary of the elements of `hamiltonians.py` so it can be more easily queried.
 - The convention for the hamiltonian parameters for command line input abides by the *fermion* hamiltonians in hamiltonians.py (not the spin hamiltonians).
