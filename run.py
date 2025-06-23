@@ -8,35 +8,44 @@ import argparse
 import matplotlib.pyplot as plt
 
 def get_cfg():
-    ap = argparse.ArgumentParser()
+    """
+    Parses command-line arguments for configuring MPS simulations.
+    Returns:
+        argparse.Namespace with configuration attributes.
+    """
+    ap = argparse.ArgumentParser(description="Configure run.")
 
     ap.add_argument("--model", type=str, required=True,
-                    help="Spin/Fermion hamiltonian")
+                    help="Model type: e.g., Spin or Fermion Hamiltonian")
 
     ap.add_argument("--d", type=int, required=True,
-                    help="dimension of physical index")
+                    help="Physical index dimension")
 
     ap.add_argument("--D", type=int, required=True,
-                    help="dimension of virtual index")
+                    help="Virtual bond dimension")
 
-    ap.add_argument("--x", type=float, required=True,
-                    help="first hamiltonian parameter")
+    hgroup = ap.add_argument_group("Hamiltonian parameters")
+    hgroup.add_argument("--x", type=float, required=True,
+                        help="First Hamiltonian parameter")
+    hgroup.add_argument("--y", type=float, required=True,
+                        help="Second Hamiltonian parameter")
+    hgroup.add_argument("--z", type=float, required=True,
+                        help="Third Hamiltonian parameter")
+    hgroup.add_argument("--mu", type=float, required=True,
+                        help="Chemical potential")
 
-    ap.add_argument("--y", type=float, required=True,
-                    help="second hamiltonian parameter")
+    ap.add_argument("--percent_evals", type=int, required=False, default=None,
+                    help="Percentage of total eigenvalues to retain (optional)")
 
-    ap.add_argument("--z", type=float, required=True,
-                    help="third hamiltonian parameter")
+    ap.add_argument("--out_dir", type=str, required=False, default=None,
+                    help="Directory to save output data (defaults to current working directory)")
 
-    ap.add_argument("--mu", type=float, required=True,
-                    help="chemical potential")
+    args = ap.parse_args()
 
-    ap.add_argument("--PercentVals", type=int, required=False, default=None,
-                    help="percentage of total eigenvalues")
+    if args.out_dir is None:
+        args.out_dir = os.getcwd()
 
-    ap.add_argument("--out_dir", required=False, default=os.getcwd(),
-                    help="directory to save data")
-    return ap.parse_args()
+    return args
 
 cfg = get_cfg()
 
@@ -48,10 +57,10 @@ y = cfg.y
 z = cfg.z
 mu = cfg.mu
 
-if cfg.PercentVals==None:
+if cfg.percent_evals==None:
     N = 0
 else:
-    N = int(np.floor(cfg.PercentVals / 100 * D**2))
+    N = int(np.floor(cfg.percent_evals / 100 * D**2))
 
 params = (model, x, y, z, mu, D)
 print('input params', params)

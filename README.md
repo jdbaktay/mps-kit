@@ -16,13 +16,39 @@ For those seeking a simpler, more pre-packaged experience, the owner encourages 
 - Various supporting tools for the main algorithms and additional analysis.
 
 ## Usage Notes
+
 - All usage has been combined in the `run.py` file with a sample layout of the main modules.
-  - Within `run.py`, we create a dictionary of the elements of `hamiltonians.py` so it can be more easily queried.
-- Parameter input from command line follows this convention:
-  `python filename.py model_name local_dim bond_dim hamiltonian_param_1 hamiltonian_param_2 hamiltonian_param_3 chemical_potential`
-  which corresponds to the input conventions for the *fermion* hamiltonians in hamiltonians.py (not the spin hamiltonians).
-  - To maintain the input convention, fermion models with more than 4 parameters have had the nearest-neighbor hopping set to t=1.
-- For excitation files, add to the command line at the end `percentage_of_eigenvalues`.
+- `run.py` accepts the following arguments for the CLI to configure the simulations:
+
+### Required Arguments
+
+| Argument   | Type   | Description                                      |
+|------------|--------|--------------------------------------------------|
+| `--model`  | `str`  | Type of Hamiltonian model (`Spin`, `Fermion`, etc.) |
+| `--d`      | `int`  | Physical index dimension                         |
+| `--D`      | `int`  | Virtual bond dimension                           |
+| `--x`      | `float`| First Hamiltonian parameter                      |
+| `--y`      | `float`| Second Hamiltonian parameter                     |
+| `--z`      | `float`| Third Hamiltonian parameter                      |
+| `--mu`     | `float`| Chemical potential                               |
+
+### Optional Arguments
+
+| Argument            | Type   | Description                                                    |
+|---------------------|--------|----------------------------------------------------------------|
+| `--percent_vals`    | `int`  | Percentage of total eigenvalues to retain (e.g., for truncation) |
+| `--out_dir`         | `str`  | Output directory to save results. Defaults to current working directory. |
+
+### Example
+
+To run a simulation with a fermion model:
+
+```bash
+python run.py --model tVV2 --d 2 --D 5 --x 1.0 --y 1.0 --z 0.0 --mu 0.0
+
+- Within `run.py`, we create a dictionary of the elements of `hamiltonians.py` so it can be more easily queried.
+- The convention for the hamiltonian parameters for command line input abides by the *fermion* hamiltonians in hamiltonians.py (not the spin hamiltonians).
+  - To maintain this convention, fermion models with more than 4 parameters have had the nearest-neighbor hopping set to t=1.
 
 ## Associated Publications
 This code was used to produce the results in the following papers:
